@@ -51,7 +51,7 @@ const DeFiMindMap: React.FC<DeFiMindMapProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-white">
+    <div className="w-full h-screen bg-white overflow-y-auto">
       {/* Close Button */}
       <button
         onClick={onClose}
