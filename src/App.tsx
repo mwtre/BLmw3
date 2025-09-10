@@ -97,7 +97,7 @@ function App() {
         </div>
 
         {/* Central Logo with Circular Navigation */}
-        <div className="flex items-center justify-center h-[70vh] relative">
+        <div className="flex items-center justify-center h-[70vh] relative px-4 md:px-0">
           {/* Central MW3 Logo */}
           <div className="text-center group cursor-pointer relative z-20">
             <div className={`mb-4 transform transition-all duration-1000 ease-out select-none ${
@@ -108,10 +108,10 @@ function App() {
               <img 
                 src={MW3Logo} 
                 alt="MW3 Logo" 
-                className="w-48 h-48 md:w-64 md:h-64 mx-auto drop-shadow-2xl"
+                className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-64 lg:h-64 mx-auto drop-shadow-2xl"
               />
             </div>
-            <div className={`text-sm tracking-[0.5em] text-gray-500 font-light transition-all duration-700 delay-500 ${
+            <div className={`text-xs sm:text-sm tracking-[0.5em] text-gray-500 font-light transition-all duration-700 delay-500 ${
               logoLoaded 
                 ? 'opacity-0 group-hover:opacity-100' 
                 : 'opacity-0'
@@ -122,16 +122,11 @@ function App() {
 
           {/* Circular Navigation Buttons */}
           {sections.map((section, index) => {
-            const radius = 200; // Distance from center
-            const angleRad = (section.angle * Math.PI) / 180;
-            const x = Math.cos(angleRad) * radius;
-            const y = Math.sin(angleRad) * radius;
-
             return (
               <button
                 key={section.id}
                 onClick={() => handleSectionClick(section.id)}
-                className={`absolute group transition-all duration-1000 ease-out hover:scale-110 ${
+                className={`nav-button absolute group transition-all duration-1000 ease-out hover:scale-110 ${
                   activeSection === section.id ? 'scale-110' : ''
                 } ${
                   buttonsLoaded 
@@ -140,19 +135,19 @@ function App() {
                 }`}
                 style={{
                   transform: buttonsLoaded 
-                    ? `translate(${x}px, ${y}px)` 
+                    ? `translate(calc(cos(${section.angle}deg) * var(--radius)), calc(sin(${section.angle}deg) * var(--radius)))` 
                     : 'translate(0px, 0px)',
                   transitionDelay: `${index * 150 + 200}ms`
                 }}
               >
                 <div className="relative">
                   {/* Button Circle */}
-                  <div className="w-20 h-20 rounded-full border-2 border-black bg-white hover:bg-black hover:text-white transition-all duration-500 flex items-center justify-center shadow-lg hover:shadow-2xl">
-                    <section.icon className="w-8 h-8 transition-colors duration-300" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full border-2 border-black bg-white hover:bg-black hover:text-white transition-all duration-500 flex items-center justify-center shadow-lg hover:shadow-2xl">
+                    <section.icon className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 transition-colors duration-300" />
                   </div>
                   
                   {/* Label */}
-                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-semibold tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute -bottom-6 sm:-bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-semibold tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">
                     {section.label}
                   </div>
 
@@ -160,7 +155,7 @@ function App() {
                   <div 
                     className="absolute top-1/2 left-1/2 origin-left h-px bg-black opacity-10 group-hover:opacity-30 transition-opacity duration-500"
                     style={{
-                      width: `${radius}px`,
+                      width: 'var(--radius)',
                       transform: `translate(-50%, -50%) rotate(${section.angle + 180}deg)`
                     }}
                   />
@@ -177,10 +172,10 @@ function App() {
           <div className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-2000 ${
             buttonsLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
           }`}>
-            <div className={`w-[500px] h-[500px] rounded-full border border-black opacity-5 transition-all duration-1500 ${
+            <div className={`w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] md:w-[500px] md:h-[500px] rounded-full border border-black opacity-5 transition-all duration-1500 ${
               buttonsLoaded ? 'animate-pulse' : ''
             }`} />
-            <div className={`absolute w-[600px] h-[600px] rounded-full border border-black opacity-3 transition-all duration-2000 ${
+            <div className={`absolute w-[350px] h-[350px] sm:w-[450px] sm:h-[450px] md:w-[600px] md:h-[600px] rounded-full border border-black opacity-3 transition-all duration-2000 ${
               buttonsLoaded ? 'animate-spin-slow' : ''
             }`} />
           </div>

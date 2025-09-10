@@ -20,3 +20,26 @@ body {
 .font-serif {
   font-family: 'TechFont', monospace;
 }
+
+/* Responsive navigation button positioning */
+.nav-button {
+  --radius: 200px;
+}
+
+@media (max-width: 640px) {
+  .nav-button {
+    --radius: 120px;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 767px) {
+  .nav-button {
+    --radius: 150px;
+  }
+}
+
+@media (min-width: 768px) {
+  .nav-button {
+    --radius: 200px;
+  }
+}
