@@ -162,8 +162,6 @@ const DeFiMindMap: React.FC<DeFiMindMapProps> = ({ onClose }) => {
             </div>
           ))}
         </div>
-
-        </div>
       </div>
 
       {/* Node Details Panel */}
