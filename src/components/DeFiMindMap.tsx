@@ -51,31 +51,35 @@ const DeFiMindMap: React.FC<DeFiMindMapProps> = ({ onClose }) => {
   };
 
   return (
-    <div className="w-full h-screen bg-white overflow-y-auto">
+    <div className="w-full min-h-screen bg-white">
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-4 md:top-8 right-4 md:right-8 z-50 p-2 md:p-3 rounded-full bg-white border-2 border-black hover:bg-black hover:text-white transition-colors"
+        className="fixed top-4 right-4 z-50 p-2 rounded-full bg-white border-2 border-black hover:bg-black hover:text-white transition-colors shadow-lg"
       >
-        <X className="w-6 h-6" />
+        <X className="w-5 h-5" />
       </button>
 
       {/* Header Section */}
-      <div className="relative w-full h-screen flex items-center justify-center p-4 md:p-8">
-      {/* Title */}
-        <div className="absolute top-4 md:top-8 left-4 md:left-8 z-30">
-          <h2 className="text-3xl md:text-5xl font-bold mb-2 font-serif">Why Open a DeFi Business?</h2>
-          <p className="text-sm md:text-base text-gray-600 font-light tracking-wide">Business will open a business account and trade, create staking pool and create a crypto reserve</p>
-        <div className="w-16 h-px bg-black mt-4" />
+      <div className="w-full pt-16 pb-8 px-4">
+        {/* Title */}
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 font-serif">Why Open a DeFi Business?</h2>
+          <p className="text-sm sm:text-base text-gray-600 font-light tracking-wide mb-4">Business will open a business account and trade, create staking pool and create a crypto reserve</p>
+          <div className="w-16 h-px bg-black" />
+        </div>
       </div>
 
-        {/* DeFi Structure Title */}
-        <div className="absolute top-32 md:top-40 left-1/2 transform -translate-x-1/2 z-20">
-          <h3 className="text-2xl md:text-3xl font-bold font-serif text-center">DeFi Structure</h3>
+      {/* DeFi Structure Title */}
+      <div className="w-full px-4 mb-8">
+        <div className="max-w-4xl mx-auto">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-bold font-serif text-center">DeFi Structure</h3>
+        </div>
       </div>
 
       {/* Mind Map Container */}
-        <div className="relative w-full max-w-6xl h-[600px] mx-auto z-10">
+      <div className="w-full px-4 mb-8">
+        <div className="relative w-full max-w-6xl h-[400px] sm:h-[500px] md:h-[600px] mx-auto">
         {/* Connection Lines */}
         <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
           {nodes.map((node) =>
@@ -159,9 +163,13 @@ const DeFiMindMap: React.FC<DeFiMindMapProps> = ({ onClose }) => {
           ))}
         </div>
 
-        {/* Node Details Panel */}
-        {selectedNode && (
-          <div className="absolute top-1/2 right-4 md:right-8 transform -translate-y-1/2 bg-white border-2 border-black p-4 md:p-6 max-w-xs md:max-w-sm animate-slide-up z-30 shadow-xl">
+        </div>
+      </div>
+
+      {/* Node Details Panel */}
+      {selectedNode && (
+        <div className="w-full px-4 mb-8">
+          <div className="max-w-4xl mx-auto bg-white border-2 border-black p-4 md:p-6 animate-slide-up shadow-xl">
             <h3 className="text-xl font-bold mb-4 font-serif">
               {nodes.find(n => n.id === selectedNode)?.label}
             </h3>
@@ -208,15 +216,15 @@ const DeFiMindMap: React.FC<DeFiMindMapProps> = ({ onClose }) => {
               )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-bounce">
-          <div className="flex flex-col items-center text-center">
-            <div className="text-sm font-semibold text-gray-600 mb-2">Scroll for more content</div>
-            <div className="w-6 h-10 border-2 border-gray-400 rounded-full flex justify-center">
-              <div className="w-1 h-3 bg-gray-400 rounded-full mt-2 animate-pulse"></div>
-            </div>
+      {/* Scroll Indicator */}
+      <div className="w-full px-4 mb-8">
+        <div className="max-w-4xl mx-auto text-center animate-bounce">
+          <div className="text-sm font-semibold text-gray-600 mb-2">Scroll for more content</div>
+          <div className="w-6 h-10 border-2 border-gray-400 rounded-full flex justify-center mx-auto">
+            <div className="w-1 h-3 bg-gray-400 rounded-full mt-2 animate-pulse"></div>
           </div>
         </div>
       </div>
@@ -225,15 +233,15 @@ const DeFiMindMap: React.FC<DeFiMindMapProps> = ({ onClose }) => {
       <div className="w-full bg-gray-50 border-t-2 border-black p-4 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-8">
-            <h3 className="text-2xl md:text-3xl font-bold font-serif mb-2">DeFi Use Cases</h3>
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-bold font-serif mb-2">DeFi Use Cases</h3>
             <p className="text-sm md:text-base text-gray-600">How businesses can leverage DeFi protocols for growth</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             {/* Decentralized Business Wallet Card */}
             <div 
               className={`bg-white border-2 border-black cursor-pointer transition-all duration-500 hover:shadow-xl ${
-                expandedCard === 'wallet' ? 'md:col-span-3' : ''
+                expandedCard === 'wallet' ? 'sm:col-span-2 lg:col-span-3' : ''
               }`}
               onClick={() => setExpandedCard(expandedCard === 'wallet' ? null : 'wallet')}
             >
