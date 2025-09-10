@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Tech Font */
+@font-face {
+  font-family: 'TechFont';
+  src: url('/fonts/Techfont.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Apply TechFont to the entire app */
+body {
+  font-family: 'TechFont', monospace;
+}
+
+/* Override serif fonts to use TechFont */
+.font-serif {
+  font-family: 'TechFont', monospace;
+}
