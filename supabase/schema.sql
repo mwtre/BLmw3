@@ -41,7 +41,6 @@ on public.trades
 for update
 using (
   (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
-  and auth.uid() = user_id
 )
 with check (
   (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
@@ -56,7 +55,6 @@ on public.trades
 for delete
 using (
   (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
-  and auth.uid() = user_id
 );
 
 -- Share snapshots: private by default, but readable by anyone who has the id if you enable the public policy.
@@ -97,7 +95,6 @@ on public.share_snapshots
 for update
 using (
   (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
-  and auth.uid() = user_id
 )
 with check (
   (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
@@ -110,7 +107,6 @@ on public.share_snapshots
 for delete
 using (
   (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
-  and auth.uid() = user_id
 );
 
 -- OPTIONAL: public read by id (share link). Uncomment to allow unauthenticated access to summary by id.
