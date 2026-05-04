@@ -155,7 +155,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [pastScreenshotImportOpen, setPastScreenshotImportOpen] = useState(false);
   const [mode, setMode] = useState<CalMode>('month');
   const [cursor, setCursor] = useState(() => new Date());
-  const [priceCoinId, setPriceCoinId] = useState('bitcoin');
+  const [priceCoinId, setPriceCoinId] = useState('btc-bitcoin');
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [priceError, setPriceError] = useState<string | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
@@ -528,7 +528,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 <p className="mb-1 text-xs tracking-[0.35em] text-gray-500">TRACKING</p>
                 <h1 className="font-serif text-3xl font-bold md:text-4xl">Profit calendar</h1>
                 <p className="mt-2 max-w-2xl text-sm text-gray-600">
-                  Log trades with CoinGecko spot prices (free tier). Open positions stay editable; closing
+                  Log trades with CoinPaprika spot prices (free tier). Open positions stay editable; closing
                   stores realized P/L locally for totals — data stays in your browser.
                 </p>
                 {BUILD && (
@@ -764,7 +764,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
 
         <section className="mb-6 flex flex-col gap-4 rounded-xl border-2 border-black p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-gray-600">CoinGecko</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-600">CoinPaprika</span>
             <select
               value={priceCoinId}
               onChange={(e) => setPriceCoinId(e.target.value)}

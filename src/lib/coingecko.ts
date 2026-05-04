@@ -1,184 +1,111 @@
-const BASE = 'https://api.coingecko.com/api/v3';
-
-/** Demo API key from CoinGecko dashboard — raises free-tier limits (still exposed in client bundle). */
-const DEMO_API_KEY = (import.meta.env.VITE_COINGECKO_API_KEY as string | undefined)?.trim() ?? '';
-
-/** User-defined prefix; target URL is appended as encoded query value (e.g. …/raw?url=). */
-const CUSTOM_PROXY_BASE =
-  (import.meta.env.VITE_CORS_PROXY_BASE as string | undefined)?.trim() ?? '';
-
-/** USD spot prices via Supabase Edge Function calling Revolut Business API (token stays server-side). */
-const USE_REVOLUT_EDGE =
-  (import.meta.env.VITE_USE_REVOLUT_EDGE_PRICES as string | undefined)?.toLowerCase() === 'true';
-/** Revolut X (crypto exchange) tickers via Edge Function — takes precedence over Business + CoinGecko when true. */
-const USE_REVOLUT_X_EDGE =
-  (import.meta.env.VITE_USE_REVOLUT_X_EDGE_PRICES as string | undefined)?.toLowerCase() === 'true';
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-const SUPABASE_ANON = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
-
-function withDemoKey(url: string): string {
-  if (!DEMO_API_KEY) return url;
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}x_cg_demo_api_key=${encodeURIComponent(DEMO_API_KEY)}`;
-}
-
-function isBrowserLocalhost(): boolean {
-  if (typeof window === 'undefined') return false;
-  const h = window.location.hostname;
-  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
-}
-
 /**
- * CoinGecko does not send CORS headers for browser origins (e.g. GitHub Pages).
- * Try several public proxies; users can set VITE_CORS_PROXY_BASE to their own worker.
+ * Market data via CoinPaprika (https://coinpaprika.com/api — free tier allows browser CORS).
+ * Stored trades may still use legacy CoinGecko-style ids; we normalize those to Paprika ids.
  */
-function proxyUrlsFor(targetUrl: string): string[] {
-  const encoded = encodeURIComponent(targetUrl);
-  const urls: string[] = [];
-  if (CUSTOM_PROXY_BASE) {
-    urls.push(`${CUSTOM_PROXY_BASE}${encoded}`);
-  }
-  urls.push(`https://api.codetabs.com/v1/proxy/?quest=${encoded}`);
-  urls.push(`https://corsproxy.io/?${encoded}`);
-  urls.push(`https://api.allorigins.win/raw?url=${encoded}`);
-  urls.push(`https://api.allorigins.win/get?url=${encoded}`);
-  return urls;
-}
 
-async function parseProxyResponse(res: Response, requestUrl: string): Promise<unknown> {
-  const text = await res.text();
-  if (!text) throw new Error('Empty response body');
-  if (requestUrl.includes('api.allorigins.win/get')) {
-    const wrapped = JSON.parse(text) as { contents?: string };
-    if (typeof wrapped.contents !== 'string') throw new Error('Invalid allorigins get payload');
-    return JSON.parse(wrapped.contents) as unknown;
-  }
-  return JSON.parse(text) as unknown;
-}
+const PAPRICA_KEY = (import.meta.env.VITE_COINPAPRICA_API_KEY as string | undefined)?.trim() ?? '';
+/** Free: api.coinpaprika.com — Pro: api-pro.coinpaprika.com + VITE_COINPAPRICA_API_KEY */
+const PAPRICA_BASE =
+  (import.meta.env.VITE_COINPAPRICA_BASE as string | undefined)?.trim()?.replace(/\/+$/, '') ||
+  (PAPRICA_KEY ? 'https://api-pro.coinpaprika.com/v1' : 'https://api.coinpaprika.com/v1');
 
-/** After a 429, pause outbound CoinGecko calls so we do not burn the whole quota. */
+/** Legacy CoinGecko ids → CoinPaprika ids (existing saved trades / imports). */
+const LEGACY_COINGECKO_TO_PAPRICA: Record<string, string> = {
+  bitcoin: 'btc-bitcoin',
+  ethereum: 'eth-ethereum',
+  solana: 'sol-solana',
+  ripple: 'xrp-xrp',
+  dogecoin: 'doge-dogecoin',
+  cardano: 'ada-cardano',
+  'avalanche-2': 'avax-avalanche',
+  avalanche2: 'avax-avalanche',
+  polkadot: 'dot-polkadot',
+  chainlink: 'link-chainlink',
+  litecoin: 'ltc-litecoin',
+  arbitrum: 'arb-arbitrum',
+  optimism: 'op-optimism',
+  aptos: 'apt-aptos',
+  sui: 'sui-sui',
+  near: 'near-near-protocol',
+  binancecoin: 'bnb-binance-coin',
+  'matic-network': 'matic-polygon',
+  maticnetwork: 'matic-polygon',
+  polygon: 'matic-polygon',
+  'polygon-ecosystem-token': 'pol-polygon-ecosystem-token',
+  tron: 'trx-tron',
+  'shiba-inu': 'shib-shiba',
+  shibainu: 'shib-shiba',
+  'the-open-network': 'ton-the-open-network',
+  'bitcoin-cash': 'bch-bitcoin-cash',
+  'ethereum-classic': 'etc-ethereum-classic',
+  uniswap: 'uni-uniswap',
+  cosmos: 'atom-cosmos',
+  pepe: 'pepe-pepe',
+  wormhole: 'w-wormhole',
+};
+
 let globalRateLimitUntil = 0;
 const RATE_LIMIT_BACKOFF_MS = 120_000;
 
 function isRateLimitMessage(msg: string): boolean {
-  return /rate limit|exceeded the rate limit|\b429\b/i.test(msg);
+  return /rate limit|429|too many/i.test(msg);
 }
 
 export function isCoingeckoRateLimitError(err: unknown): boolean {
   return err instanceof Error && isRateLimitMessage(err.message);
 }
 
-/** Short message for UI when CoinGecko or proxies refuse requests. */
 export function formatCoingeckoError(err: unknown): string {
   if (!(err instanceof Error)) return 'Market data request failed';
-  if (/VITE_USE_REVOLUT_X_EDGE_PRICES requires/i.test(err.message)) return err.message;
-  if (/VITE_USE_REVOLUT_EDGE_PRICES requires/i.test(err.message)) return err.message;
-  if (/Revolut X prices/i.test(err.message)) {
-    return 'Revolut X prices failed — deploy revolut-x-prices and set REVOLUT_X_API_KEY + REVOLUT_X_PRIVATE_KEY in Supabase (see supabase/functions/revolut-x-prices).';
-  }
-  if (/Revolut prices/i.test(err.message)) {
-    return 'Revolut prices failed — deploy the revolut-prices Edge Function and set REVOLUT_ACCESS_TOKEN in Supabase (see supabase/functions/revolut-prices).';
-  }
   if (isRateLimitMessage(err.message)) {
-    if (USE_REVOLUT_X_EDGE || USE_REVOLUT_EDGE) {
-      return 'Rate limit or upstream error. If you use Revolut, check the Edge Function; otherwise add VITE_COINGECKO_API_KEY for CoinGecko.';
-    }
-    return DEMO_API_KEY
-      ? 'CoinGecko rate limit — wait a few minutes or check your API plan.'
-      : 'CoinGecko free tier is rate-limited. Wait ~2 min, refresh less often, add VITE_COINGECKO_API_KEY, or use VITE_USE_REVOLUT_X_EDGE_PRICES / VITE_USE_REVOLUT_EDGE_PRICES with a Supabase Edge Function.';
+    return PAPRICA_KEY
+      ? 'CoinPaprika rate limit — wait and retry, or check your API plan.'
+      : 'CoinPaprika rate limit — wait ~2 min or add VITE_COINPAPRICA_API_KEY for higher limits.';
   }
   return err.message;
 }
 
-async function fetchRevolutEdgePrices(
-  coinIds: string[],
-  signal?: AbortSignal
-): Promise<Record<string, { usd?: number }>> {
-  if (!SUPABASE_URL || !SUPABASE_ANON) {
-    throw new Error('VITE_USE_REVOLUT_EDGE_PRICES requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-  }
-  const params = new URLSearchParams({ ids: [...new Set(coinIds)].join(',') });
-  const fnUrl = `${SUPABASE_URL.replace(/\/+$/, '')}/functions/v1/revolut-prices?${params}`;
-  const res = await fetch(fnUrl, {
-    signal,
-    headers: {
-      Authorization: `Bearer ${SUPABASE_ANON}`,
-      apikey: SUPABASE_ANON,
-    },
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Revolut prices (${res.status}): ${t.slice(0, 240)}`);
-  }
-  return res.json() as Promise<Record<string, { usd?: number }>>;
+export function normalizeToPaprikaCoinId(id: string): string {
+  const t = id.trim().toLowerCase();
+  return LEGACY_COINGECKO_TO_PAPRICA[t] ?? t;
 }
 
-async function fetchRevolutXEdgePrices(
-  coinIds: string[],
-  signal?: AbortSignal
-): Promise<Record<string, { usd?: number }>> {
-  if (!SUPABASE_URL || !SUPABASE_ANON) {
-    throw new Error('VITE_USE_REVOLUT_X_EDGE_PRICES requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-  }
-  const params = new URLSearchParams({ ids: [...new Set(coinIds)].join(',') });
-  const fnUrl = `${SUPABASE_URL.replace(/\/+$/, '')}/functions/v1/revolut-x-prices?${params}`;
-  const res = await fetch(fnUrl, {
-    signal,
-    headers: {
-      Authorization: `Bearer ${SUPABASE_ANON}`,
-      apikey: SUPABASE_ANON,
-    },
-  });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Revolut X prices (${res.status}): ${t.slice(0, 240)}`);
-  }
-  return res.json() as Promise<Record<string, { usd?: number }>>;
-}
+type PaprikaTicker = {
+  id?: string;
+  quotes?: { USD?: { price?: number } };
+};
 
-function throwIfCoingeckoErrorPayload(data: unknown): void {
-  if (!data || typeof data !== 'object') return;
-  if (!('status' in data)) return;
-  const st = (data as { status?: { error_code?: number; error_message?: string } }).status;
-  if (st && typeof st.error_code === 'number' && st.error_code !== 0) {
-    if (st.error_code === 429) {
-      globalRateLimitUntil = Math.max(globalRateLimitUntil, Date.now() + RATE_LIMIT_BACKOFF_MS);
-    }
-    throw new Error(st.error_message ?? `CoinGecko error ${st.error_code}`);
-  }
-}
+type PaprikaSearchCurrency = {
+  id: string;
+  name: string;
+  symbol: string;
+};
 
-async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+type PaprikaSearchResponse = {
+  currencies?: PaprikaSearchCurrency[];
+};
+
+async function fetchPaprikaJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (typeof window !== 'undefined' && Date.now() < globalRateLimitUntil) {
     throw new Error(
-      `CoinGecko rate limit — cooling down. Retry after ${Math.ceil((globalRateLimitUntil - Date.now()) / 1000)}s or set VITE_COINGECKO_API_KEY.`
+      `Rate limit — cooling down. Retry after ${Math.ceil((globalRateLimitUntil - Date.now()) / 1000)}s.`
     );
   }
 
-  const directFirst = isBrowserLocalhost();
-  const attempts = directFirst
-    ? [url, ...proxyUrlsFor(url)]
-    : [...proxyUrlsFor(url), url];
+  const url = `${PAPRICA_BASE}${path.startsWith('/') ? path : `/${path}`}`;
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (PAPRICA_KEY) headers.Authorization = PAPRICA_KEY;
 
-  let lastErr: unknown;
-  for (const attemptUrl of attempts) {
-    try {
-      const res = await fetch(attemptUrl, { signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await parseProxyResponse(res, attemptUrl)) as T;
-      throwIfCoingeckoErrorPayload(data);
-      return data;
-    } catch (e) {
-      lastErr = e;
-      const msg = e instanceof Error ? e.message : String(e);
-      if (isRateLimitMessage(msg)) break;
-    }
+  const res = await fetch(url, { signal, headers });
+  if (res.status === 429) {
+    globalRateLimitUntil = Date.now() + RATE_LIMIT_BACKOFF_MS;
+    throw new Error('CoinPaprika rate limit — try again shortly.');
   }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
 }
 
-/** Fewer round-trips = fewer 429s on the free tier + shared proxy IPs. */
-const PRICE_CACHE_TTL_MS = DEMO_API_KEY ? 60_000 : 180_000;
+const PRICE_CACHE_TTL_MS = PAPRICA_KEY ? 60_000 : 180_000;
 const priceCache = new Map<
   string,
   { at: number; data: Record<string, { usd?: number }> }
@@ -190,7 +117,7 @@ function priceCacheKey(ids: string[]) {
   return [...new Set(ids)].sort().join(',');
 }
 
-/** ids: comma-separated CoinGecko ids, e.g. bitcoin,ethereum */
+/** Coin ids: Paprika ids (e.g. btc-bitcoin) or legacy CoinGecko ids (e.g. bitcoin). */
 export async function fetchSimpleUsdPrices(
   coinIds: string[],
   signal?: AbortSignal
@@ -207,46 +134,40 @@ export async function fetchSimpleUsdPrices(
   if (existing) return existing;
 
   const p = (async () => {
-    if (USE_REVOLUT_X_EDGE) {
-      try {
-        const data = await fetchRevolutXEdgePrices(coinIds, signal);
-        priceCache.set(key, { at: Date.now(), data });
-        return data;
-      } catch (e) {
-        const stale = priceCache.get(key);
-        if (stale && isCoingeckoRateLimitError(e)) return stale.data;
-        throw e;
+    const uniqueRaw = [...new Set(coinIds)];
+    const pairs = uniqueRaw.map((raw) => ({ raw, paprika: normalizeToPaprikaCoinId(raw) }));
+    const uniquePaprika = [...new Set(pairs.map((p) => p.paprika))];
+
+    const tickerByPaprika = new Map<string, PaprikaTicker>();
+    const chunk = 8;
+    for (let i = 0; i < uniquePaprika.length; i += chunk) {
+      const slice = uniquePaprika.slice(i, i + chunk);
+      await Promise.all(
+        slice.map(async (pid) => {
+          try {
+            const t = await fetchPaprikaJson<PaprikaTicker>(
+              `/tickers/${encodeURIComponent(pid)}`,
+              signal
+            );
+            tickerByPaprika.set(pid, t);
+          } catch {
+            // missing coin / network — leave absent
+          }
+        })
+      );
+    }
+
+    const out: Record<string, { usd?: number }> = {};
+    for (const { raw, paprika } of pairs) {
+      const t = tickerByPaprika.get(paprika);
+      const price = t?.quotes?.USD?.price;
+      if (typeof price === 'number' && Number.isFinite(price)) {
+        out[raw] = { usd: price };
       }
     }
 
-    if (USE_REVOLUT_EDGE) {
-      try {
-        const data = await fetchRevolutEdgePrices(coinIds, signal);
-        priceCache.set(key, { at: Date.now(), data });
-        return data;
-      } catch (e) {
-        const stale = priceCache.get(key);
-        if (stale && isCoingeckoRateLimitError(e)) return stale.data;
-        throw e;
-      }
-    }
-
-    const params = new URLSearchParams({
-      ids: [...new Set(coinIds)].join(','),
-      vs_currencies: 'usd',
-    });
-    const upstream = withDemoKey(`${BASE}/simple/price?${params}`);
-    try {
-      const data = await fetchJson<Record<string, { usd?: number }>>(upstream, signal);
-      priceCache.set(key, { at: Date.now(), data });
-      return data;
-    } catch (e) {
-      const stale = priceCache.get(key);
-      if (stale && isCoingeckoRateLimitError(e)) {
-        return stale.data;
-      }
-      throw e;
-    }
+    priceCache.set(key, { at: Date.now(), data: out });
+    return out;
   })();
 
   priceInflight.set(key, p);
@@ -281,11 +202,15 @@ export async function searchCoins(
   if (inflight) return inflight;
 
   const p = (async () => {
-    const upstream = withDemoKey(`${BASE}/search?query=${encodeURIComponent(q)}`);
-    const data = await fetchJson<{
-      coins?: { id: string; symbol: string; name: string; thumb: string }[];
-    }>(upstream, signal);
-    const list = (data.coins ?? []).slice(0, 20);
+    const data = await fetchPaprikaJson<PaprikaSearchResponse>(
+      `/search/?q=${encodeURIComponent(q)}`,
+      signal
+    );
+    const list = (data.currencies ?? []).slice(0, 20).map((c) => ({
+      id: c.id,
+      symbol: c.symbol,
+      name: c.name,
+    }));
     searchCache.set(q, { at: Date.now(), data: list });
     return list;
   })();
@@ -298,11 +223,12 @@ export async function searchCoins(
   }
 }
 
+/** CoinPaprika ids for the popular picker (labels stay familiar). */
 export const POPULAR_COIN_IDS = [
-  { id: 'bitcoin', label: 'BTC' },
-  { id: 'ethereum', label: 'ETH' },
-  { id: 'solana', label: 'SOL' },
-  { id: 'ripple', label: 'XRP' },
-  { id: 'cardano', label: 'ADA' },
-  { id: 'dogecoin', label: 'DOGE' },
+  { id: 'btc-bitcoin', label: 'BTC' },
+  { id: 'eth-ethereum', label: 'ETH' },
+  { id: 'sol-solana', label: 'SOL' },
+  { id: 'xrp-xrp', label: 'XRP' },
+  { id: 'ada-cardano', label: 'ADA' },
+  { id: 'doge-dogecoin', label: 'DOGE' },
 ] as const;

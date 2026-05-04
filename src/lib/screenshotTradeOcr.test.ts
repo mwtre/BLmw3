@@ -25,7 +25,7 @@ describe('screenshotTradeOcr', () => {
   });
 
   it('coingeckoIdForTicker maps known tickers', () => {
-    expect(coingeckoIdForTicker('BTC')).toBe('bitcoin');
+    expect(coingeckoIdForTicker('BTC')).toBe('btc-bitcoin');
     expect(coingeckoIdForTicker('XX')).toBeNull();
   });
 

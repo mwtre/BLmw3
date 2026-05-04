@@ -92,7 +92,7 @@ export default function ScreenshotImportModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const [priceCoinId, setPriceCoinId] = useState('bitcoin');
+  const [priceCoinId, setPriceCoinId] = useState('btc-bitcoin');
   const [symbolLabel, setSymbolLabel] = useState('BTC');
   const [searchQ, setSearchQ] = useState('');
   const [searchHits, setSearchHits] = useState<{ id: string; symbol: string; name: string }[]>([]);
@@ -126,7 +126,7 @@ export default function ScreenshotImportModal({
       setAsClosed(false);
       setOpenedAt(new Date().toISOString().slice(0, 10));
       setClosedAt(new Date().toISOString().slice(0, 10));
-      setPriceCoinId('bitcoin');
+      setPriceCoinId('btc-bitcoin');
       setSymbolLabel('BTC');
       setPreviewUrl((prev) => {
         if (prev) URL.revokeObjectURL(prev);
@@ -174,7 +174,7 @@ export default function ScreenshotImportModal({
     setAsClosed(false);
     setOpenedAt(new Date().toISOString().slice(0, 10));
     setClosedAt(new Date().toISOString().slice(0, 10));
-    setPriceCoinId('bitcoin');
+    setPriceCoinId('btc-bitcoin');
     setSymbolLabel('BTC');
   };
 
@@ -187,7 +187,7 @@ export default function ScreenshotImportModal({
       if (id) {
         setPriceCoinId(id);
       } else {
-        // Resolve ticker -> CoinGecko id via API search (best-effort).
+        // Resolve ticker -> CoinPaprika id via API search (best-effort).
         try {
           const hits = await searchCoins(tick);
           const exact = hits.find((h) => h.symbol.toLowerCase() === tick.toLowerCase()) ?? hits[0];
@@ -470,7 +470,7 @@ export default function ScreenshotImportModal({
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase text-gray-600">CoinGecko</label>
+            <label className="block text-xs font-semibold uppercase text-gray-600">CoinPaprika</label>
             <select
               value={priceCoinId}
               onChange={(e) => {

@@ -1,9 +1,9 @@
 export type TradeStatus = 'open' | 'closed';
 
-/** Spot-style trade journal entry (USD prices from CoinGecko alignment). */
+/** Spot-style trade journal entry (USD spot prices via CoinPaprika). */
 export interface ProfitTrade {
   id: string;
-  /** CoinGecko coin id, e.g. bitcoin */
+  /** Coin id (CoinPaprika, e.g. btc-bitcoin); legacy CoinGecko ids are normalized when fetching prices */
   coinGeckoId: string;
   symbol: string;
   openedAt: string;

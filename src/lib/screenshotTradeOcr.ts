@@ -33,33 +33,35 @@ const KNOWN_TICKERS = new Set([
   'ETC',
 ]);
 
-/** Map uppercase ticker hint → CoinGecko id when unambiguous. */
+/** Map uppercase ticker hint → CoinPaprika coin id when unambiguous. */
 export const TICKER_TO_COINGECKO: Record<string, string> = {
-  BTC: 'bitcoin',
-  ETH: 'ethereum',
-  SOL: 'solana',
-  XRP: 'ripple',
-  DOGE: 'dogecoin',
-  ADA: 'cardano',
-  AVAX: 'avalanche-2',
-  DOT: 'polkadot',
-  LINK: 'chainlink',
-  UNI: 'uniswap',
-  ATOM: 'cosmos',
-  LTC: 'litecoin',
-  ARB: 'arbitrum',
-  OP: 'optimism',
-  APT: 'aptos',
-  SUI: 'sui',
-  NEAR: 'near',
-  BNB: 'binancecoin',
-  MATIC: 'matic-network',
-  POL: 'polygon-ecosystem-token',
-  TRX: 'tron',
-  SHIB: 'shiba-inu',
-  TON: 'the-open-network',
-  BCH: 'bitcoin-cash',
-  ETC: 'ethereum-classic',
+  BTC: 'btc-bitcoin',
+  ETH: 'eth-ethereum',
+  SOL: 'sol-solana',
+  XRP: 'xrp-xrp',
+  DOGE: 'doge-dogecoin',
+  ADA: 'ada-cardano',
+  AVAX: 'avax-avalanche',
+  DOT: 'dot-polkadot',
+  LINK: 'link-chainlink',
+  UNI: 'uni-uniswap',
+  ATOM: 'atom-cosmos',
+  LTC: 'ltc-litecoin',
+  ARB: 'arb-arbitrum',
+  OP: 'op-optimism',
+  APT: 'apt-aptos',
+  SUI: 'sui-sui',
+  NEAR: 'near-near-protocol',
+  BNB: 'bnb-binance-coin',
+  MATIC: 'matic-polygon',
+  POL: 'pol-polygon-ecosystem-token',
+  TRX: 'trx-tron',
+  SHIB: 'shib-shiba',
+  TON: 'ton-the-open-network',
+  BCH: 'bch-bitcoin-cash',
+  ETC: 'etc-ethereum-classic',
+  PEPE: 'pepe-pepe',
+  WIF: 'wif-dogwifhat',
 };
 
 /** Comma-thousands must include `,###` so we do not match `418` inside `41800`. */
@@ -93,7 +95,7 @@ export function extractOrderedPrices(text: string): number[] {
 export function guessTicker(text: string): string | null {
   const upper = text.toUpperCase();
   // TradingView-style pairs often show as BTCUSD / ETHUSDT / SOLUSDC.
-  // Prefer the base ticker so we can look it up on CoinGecko.
+  // Prefer the base ticker so we can look it up on CoinPaprika.
   const pair = upper.match(/\b([A-Z]{2,10})(USD|USDT|USDC|PERP)\b/);
   if (pair?.[1]) return pair[1];
   for (const t of KNOWN_TICKERS) {
