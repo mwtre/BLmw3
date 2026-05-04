@@ -30,7 +30,7 @@ create policy "trades_insert_admin"
 on public.trades
 for insert
 with check (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 );
 
@@ -40,11 +40,11 @@ create policy "trades_update_admin"
 on public.trades
 for update
 using (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 )
 with check (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 );
 
@@ -55,7 +55,7 @@ create policy "trades_delete_admin"
 on public.trades
 for delete
 using (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 );
 
@@ -86,7 +86,7 @@ create policy "share_insert_admin"
 on public.share_snapshots
 for insert
 with check (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 );
 
@@ -96,11 +96,11 @@ create policy "share_update_admin"
 on public.share_snapshots
 for update
 using (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 )
 with check (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 );
 
@@ -109,7 +109,7 @@ create policy "share_delete_admin"
 on public.share_snapshots
 for delete
 using (
-  ((auth.jwt()->>'email') = 'egos.kappa88@hotmail.it')
+  (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it')
   and auth.uid() = user_id
 );
 
