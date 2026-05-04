@@ -198,13 +198,15 @@ export function useTradesStorage() {
       return;
     }
     void syncNow();
-    // Periodic sync, but don't hammer when in persistent error state.
+    // Periodic sync for admins only (guest/public reads sync on mount + manual refresh).
+    if (!admin) return;
+    const intervalMs = 120_000;
     const t = window.setInterval(() => {
       if (syncInFlight.current) return;
       // If the last attempt errored, require a manual click to retry.
       if (syncError) return;
       void syncNow();
-    }, 30_000);
+    }, intervalMs);
     return () => window.clearInterval(t);
   }, [syncNow, syncError, authSession]);
 

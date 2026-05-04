@@ -174,6 +174,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [priceNonce, setPriceNonce] = useState(0);
 
   const readOnly = supabaseEnabled && !isAdmin;
+  /** Editable UI when cloud lock is off, or when signed-in owner matches VITE_ADMIN_EMAIL */
+  const canEdit = !readOnly;
 
   useEffect(() => {
     const p = POPULAR_COIN_IDS.find((c) => c.id === priceCoinId);
@@ -239,6 +241,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [openPrices, setOpenPrices] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
+    if (readOnly) return;
     const ids = [...new Set(openTrades.map((t) => t.coinGeckoId))];
     if (ids.length === 0) {
       setOpenPrices({});
@@ -246,6 +249,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     }
     const ac = new AbortController();
     const run = async () => {
+      if (document.visibilityState === 'hidden') return;
       try {
         const data = await fetchSimpleUsdPrices(ids, ac.signal);
         if (ac.signal.aborted) return;
@@ -257,12 +261,12 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       }
     };
     void run();
-    const t = window.setInterval(run, 30_000);
+    const t = window.setInterval(run, 90_000);
     return () => {
       ac.abort();
       window.clearInterval(t);
     };
-  }, [openTrades]);
+  }, [openTrades, readOnly]);
 
   const rangeLabel = useMemo(() => {
     if (mode === 'month') {
@@ -325,10 +329,25 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
 
   const onSubmitTrade = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin) return;
+    if (readOnly) {
+      setImportMessage('Only the owner account can add trades while cloud sync is enabled.');
+      return;
+    }
     const ep = parseFloat(entryPrice);
     const q = parseFloat(qty);
-    if (!Number.isFinite(ep) || !Number.isFinite(q) || q <= 0) return;
+    if (!Number.isFinite(ep) || ep <= 0) {
+      setImportMessage('Enter a valid entry price (USD).');
+      return;
+    }
+    if (!Number.isFinite(q) || q <= 0) {
+      setImportMessage('Enter a valid equity amount (USD).');
+      return;
+    }
+    const opened = new Date(openedAt);
+    if (Number.isNaN(opened.getTime())) {
+      setImportMessage('Pick a valid opened date.');
+      return;
+    }
     const pt = planTarget.trim() ? parseFloat(planTarget) : NaN;
     const planNote = Number.isFinite(pt) ? `Plan target: ${pt}` : '';
     const mergedNotes = [notes.trim(), planNote].filter(Boolean).join(' · ');
@@ -344,6 +363,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       notes: mergedNotes,
       position,
     });
+    setImportMessage(null);
     setNotes('');
     setPlanTarget('');
     setFormOpen(false);
@@ -375,7 +395,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       setImportMessage('Supabase is not enabled (missing env keys).');
       return;
     }
-    if (!isAdmin) {
+    if (readOnly) {
       setImportMessage('Only the owner account can create share links.');
       return;
     }
@@ -447,7 +467,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const onPickImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setImportMessage(null);
-    if (!isAdmin) {
+    if (readOnly) {
       setImportMessage('Only the owner account can import trades.');
       e.target.value = '';
       return;
@@ -1173,7 +1193,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           )}
-                          {isAdmin ? (
+                          {canEdit ? (
                             <>
                               <button
                                 type="button"
@@ -1304,7 +1324,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           )}
-                          {isAdmin ? (
+                          {canEdit ? (
                             <>
                               <button
                                 type="button"
