@@ -55,8 +55,9 @@ function fmtQtyCell(n: unknown): string {
 
 const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
 
-function parsePlanTarget(notes: string): number | null {
-  const m = notes.match(/plan\s+target:\s*([0-9][0-9,]*\.?[0-9]*)/i);
+function parsePlanTarget(notes: string | null | undefined): number | null {
+  const text = typeof notes === 'string' ? notes : '';
+  const m = text.match(/plan\s+target:\s*([0-9][0-9,]*\.?[0-9]*)/i);
   if (!m?.[1]) return null;
   const n = parseFloat(m[1].replace(/,/g, ''));
   return Number.isFinite(n) ? n : null;
@@ -173,13 +174,14 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [searchHits, setSearchHits] = useState<{ id: string; symbol: string; name: string }[]>([]);
   const [searchCoinError, setSearchCoinError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
   const [closeTarget, setCloseTarget] = useState<ProfitTrade | null>(null);
   const [closeExit, setCloseExit] = useState('');
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
   const [linkValue, setLinkValue] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
 
-  const [entryPrice, setEntryPrice] = useState('');
+  const [entryPrice, setEntryPrice] = useState('1');
   const [qty, setQty] = useState('1000');
   const [position, setPosition] = useState<'long' | 'short'>('long');
   const [planTarget, setPlanTarget] = useState('');
@@ -189,9 +191,9 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [symbolLabel, setSymbolLabel] = useState('BTC');
   const [priceNonce, setPriceNonce] = useState(0);
 
-  const readOnly = supabaseEnabled && !isAdmin;
-  /** Editable UI when cloud lock is off, or when signed-in owner matches VITE_ADMIN_EMAIL */
-  const canEdit = !readOnly;
+  /** Editing is always allowed here; Supabase RLS still controls who can upload. */
+  const readOnly = false;
+  const canEdit = true;
 
   useEffect(() => {
     const p = POPULAR_COIN_IDS.find((c) => c.id === priceCoinId);
@@ -351,23 +353,20 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
 
   const onSubmitTrade = (e: React.FormEvent) => {
     e.preventDefault();
-    if (readOnly) {
-      setImportMessage('Only the owner account can add trades while cloud sync is enabled.');
-      return;
-    }
+    setFormSubmitError(null);
     const ep = parseFloat(entryPrice);
     const q = parseFloat(qty);
     if (!Number.isFinite(ep) || ep <= 0) {
-      setImportMessage('Enter a valid entry price (USD).');
+      setFormSubmitError('Enter a valid entry price (USD).');
       return;
     }
     if (!Number.isFinite(q) || q <= 0) {
-      setImportMessage('Enter a valid equity amount (USD).');
+      setFormSubmitError('Enter a valid equity amount (USD).');
       return;
     }
     const opened = new Date(openedAt);
     if (Number.isNaN(opened.getTime())) {
-      setImportMessage('Pick a valid opened date.');
+      setFormSubmitError('Pick a valid opened date.');
       return;
     }
     const pt = planTarget.trim() ? parseFloat(planTarget) : NaN;
@@ -386,7 +385,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       notes: mergedNotes,
       position,
     });
-    setImportMessage(null);
+    setFormSubmitError(null);
     setNotes('');
     setPlanTarget('');
     setFormOpen(false);
@@ -416,10 +415,6 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const createShareLink = async () => {
     if (!supabaseEnabled || !supabase) {
       setImportMessage('Supabase is not enabled (missing env keys).');
-      return;
-    }
-    if (readOnly) {
-      setImportMessage('Only the owner account can create share links.');
       return;
     }
     if (shareBusy) return;
@@ -490,11 +485,6 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const onPickImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setImportMessage(null);
-    if (readOnly) {
-      setImportMessage('Only the owner account can import trades.');
-      e.target.value = '';
-      return;
-    }
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -769,7 +759,23 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
             </div>
             <button
               type="button"
-              onClick={() => setFormOpen((v) => !v)}
+              onClick={() => {
+                setImportMessage(null);
+                setFormSubmitError(null);
+                setFormOpen((v) => {
+                  if (!v) {
+                    if (
+                      !entryPrice.trim() ||
+                      !Number.isFinite(parseFloat(entryPrice)) ||
+                      parseFloat(entryPrice) <= 0
+                    ) {
+                      if (livePrice != null) setEntryPrice(String(livePrice));
+                      else setEntryPrice('1');
+                    }
+                  }
+                  return !v;
+                });
+              }}
               disabled={readOnly}
               className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-black px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-gray-900 disabled:opacity-50"
             >
@@ -853,6 +859,14 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
             onSubmit={onSubmitTrade}
             className="mb-8 grid gap-4 rounded-xl border-2 border-dashed border-black p-4 md:grid-cols-2"
           >
+            {formSubmitError && (
+              <div
+                className="md:col-span-2 rounded-lg border-2 border-red-800 bg-red-50 p-3 text-sm font-semibold text-red-900"
+                role="alert"
+              >
+                {formSubmitError}
+              </div>
+            )}
             <label className="block text-sm">
               <span className="text-xs font-semibold uppercase text-gray-600">Opened (local date)</span>
               <input
@@ -931,7 +945,10 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               </button>
               <button
                 type="button"
-                onClick={() => setFormOpen(false)}
+                onClick={() => {
+                  setFormOpen(false);
+                  setFormSubmitError(null);
+                }}
                 className="rounded-full border-2 border-black px-6 py-2 font-bold uppercase tracking-wide"
               >
                 Cancel

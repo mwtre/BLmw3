@@ -38,7 +38,7 @@ export default function HomeHub({
       <div
         className={`relative z-10 min-h-screen transition-all duration-1000 ease-in-out ${
           activeSection ? 'scale-90 opacity-20' : 'scale-100 opacity-100'
-        } ${isLoading || isReturning ? 'pointer-events-none' : ''}`}
+        } ${isLoading || isReturning || activeSection ? 'pointer-events-none' : ''}`}
       >
         <div
           className={`pt-12 text-center transition-all duration-1000 ${

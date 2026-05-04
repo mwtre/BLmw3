@@ -8,7 +8,7 @@ import {
   saveTrades,
 } from '../lib/tradesPersist';
 import { syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
-import { isAdminSession } from '../lib/adminAccess';
+import { adminEmailConfigured, isAdminSession } from '../lib/adminAccess';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
 function uid() {
@@ -38,14 +38,14 @@ export function useTradesStorage() {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const syncInFlight = useRef(false);
   const syncWatchdog = useRef<number | null>(null);
-
-  const persistLocal = isAdminSession(authSession?.user);
+  /** Avoid listing syncError on the periodic-sync effect (would re-run sync on every error update → CPU spike). */
+  const syncErrorRef = useRef<string | null>(null);
+  syncErrorRef.current = syncError;
 
   useEffect(() => {
-    if (!persistLocal) return;
     const { ok, error } = saveTrades(allTrades);
     setStorageError(ok ? null : error ?? 'Save failed');
-  }, [allTrades, persistLocal]);
+  }, [allTrades]);
 
   const clearStorageError = useCallback(() => setStorageError(null), []);
 
@@ -203,12 +203,12 @@ export function useTradesStorage() {
     const intervalMs = 120_000;
     const t = window.setInterval(() => {
       if (syncInFlight.current) return;
-      // If the last attempt errored, require a manual click to retry.
-      if (syncError) return;
+      // If the last attempt errored, require a manual click to retry (read ref — do not depend on syncError).
+      if (syncErrorRef.current) return;
       void syncNow();
     }, intervalMs);
     return () => window.clearInterval(t);
-  }, [syncNow, syncError, authSession]);
+  }, [syncNow, authSession]);
 
   return {
     trades,
@@ -227,7 +227,8 @@ export function useTradesStorage() {
     lastSyncAt,
     authSession,
     refreshSession,
-    persistLocal,
-    isAdmin: persistLocal,
+    persistLocal: true,
+    /** Historical name: used by Profit header sync button (disables manual sync while signed out). */
+    isAdmin: true,
   };
 }

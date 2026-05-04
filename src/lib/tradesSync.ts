@@ -100,7 +100,8 @@ export async function syncTradesOnce(
       }
     }
 
-    const merged = admin ? mergeTrades(current, remoteTrades) : remoteTrades;
+    // Always merge so local-only rows (e.g. viewer-added trades) survive pull; non-admins still skip push below.
+    const merged = mergeTrades(current, remoteTrades);
     setNext(merged);
 
     // bump last pull watermark
