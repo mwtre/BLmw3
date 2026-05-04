@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
-import { X, Users, Vote, Shield, Coins, FileText, Gavel, Target, Globe, Lock } from 'lucide-react';
+import React from 'react';
+import { Users, Vote, Shield, Coins, FileText, Gavel, Target, Globe, Lock } from 'lucide-react';
+import { useMindMapInteraction } from '../hooks/useMindMapInteraction';
+import MindMapCloseButton from './mind-map/MindMapCloseButton';
+import MindMapDetailShell from './mind-map/MindMapDetailShell';
+import MindMapGraph from './mind-map/MindMapGraph';
+import type { MindMapNode } from '../types/mindMap';
 
 interface DAOMindMapProps {
   onClose: () => void;
 }
 
 const DAOMindMap: React.FC<DAOMindMapProps> = ({ onClose }) => {
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
-  
-  const nodes = [
+  const {
+    hoveredNode,
+    setHoveredNode,
+    selectedNode,
+    toggleSelectNode,
+    clearSelection,
+    expandedCard,
+    setExpandedCard,
+  } = useMindMapInteraction();
+
+  const nodes: MindMapNode[] = [
     // Core governance layer
     { id: 'governance', icon: Vote, label: 'Governance', x: 50, y: 20, size: 'large', connections: ['proposals', 'voting', 'treasury'] },
     
@@ -34,24 +45,9 @@ const DAOMindMap: React.FC<DAOMindMapProps> = ({ onClose }) => {
     { id: 'execution', icon: Globe, label: 'Execution', x: 65, y: 50, size: 'medium', connections: ['voting', 'multisig', 'rewards'] }
   ];
 
-  const getSizeClass = (size: string) => {
-    switch (size) {
-      case 'large': return 'w-16 h-16 p-4';
-      case 'medium': return 'w-12 h-12 p-3';
-      case 'small': return 'w-10 h-10 p-2';
-      default: return 'w-12 h-12 p-3';
-    }
-  };
-
   return (
     <div className="w-full h-screen bg-white overflow-y-auto">
-      {/* Close Button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 md:top-8 right-4 md:right-8 z-50 p-2 md:p-3 rounded-full bg-white border-2 border-black hover:bg-black hover:text-white transition-colors"
-      >
-        <X className="w-6 h-6" />
-      </button>
+      <MindMapCloseButton onClose={onClose} variant="absolute" />
 
       {/* Header Section */}
       <div className="relative w-full h-screen flex items-center justify-center p-4 md:p-8">
@@ -69,145 +65,68 @@ const DAOMindMap: React.FC<DAOMindMapProps> = ({ onClose }) => {
       </div>
 
       {/* Mind Map Container */}
-        <div className="relative w-full max-w-6xl h-[600px] mx-auto z-10">
-        {/* Connection Lines */}
-        <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
-          <defs>
+        <MindMapGraph
+          nodes={nodes}
+          containerClassName="h-[600px] z-10"
+          hoveredNode={hoveredNode}
+          selectedNode={selectedNode}
+          onHoverNode={setHoveredNode}
+          onToggleSelectNode={toggleSelectNode}
+          backgroundPatternId="daoPattern"
+          svgExtraDefs={
             <pattern id="daoPattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
               <circle cx="10" cy="10" r="1" fill="black" opacity="0.1" />
             </pattern>
-          </defs>
-          
-          {nodes.map((node) =>
-            node.connections.map((connId) => {
-              const connectedNode = nodes.find(n => n.id === connId);
-              if (!connectedNode) return null;
-                
-                const isHighlighted = hoveredNode === node.id || hoveredNode === connId;
-                const isSelected = selectedNode === node.id || selectedNode === connId;
-              
-              return (
-                <g key={`${node.id}-${connId}`}>
-                  <line
-                    x1={`${node.x}%`}
-                    y1={`${node.y}%`}
-                    x2={`${connectedNode.x}%`}
-                    y2={`${connectedNode.y}%`}
-                      stroke={isHighlighted ? "black" : "black"}
-                      strokeWidth={isHighlighted ? "2" : "1"}
-                      opacity={isHighlighted ? "0.6" : isSelected ? "0.4" : "0.2"}
-                      strokeDasharray={isHighlighted ? "0" : "5,5"}
-                      className="transition-all duration-300"
-                  />
-                </g>
-              );
-            })
-          )}
-        </svg>
+          }
+        />
 
-        {/* Nodes */}
-        {nodes.map((node, index) => (
-          <div
-            key={node.id}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out animate-scale-in`}
-            style={{
-              left: `${node.x}%`,
-              top: `${node.y}%`,
-              zIndex: 10,
-              animationDelay: `${index * 100}ms`
-            }}
-          >
-              <div 
-                className="group cursor-pointer"
-                onMouseEnter={() => setHoveredNode(node.id)}
-                onMouseLeave={() => setHoveredNode(null)}
-                onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
-              >
-                <div className={`relative ${getSizeClass(node.size)} rounded-full border-2 transition-all duration-500 hover:scale-110 hover:shadow-xl flex items-center justify-center ${
-                  selectedNode === node.id 
-                    ? 'border-black bg-black text-white shadow-2xl scale-110' 
-                    : hoveredNode === node.id
-                    ? 'border-black bg-black text-white shadow-xl'
-                    : 'border-black bg-white hover:bg-black hover:text-white'
-                }`}>
-                <node.icon className="transition-colors" />
-                
-                {/* Node label */}
-                  <div className={`absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-semibold tracking-wider transition-opacity duration-300 whitespace-nowrap ${
-                    hoveredNode === node.id || selectedNode === node.id ? 'opacity-100' : 'opacity-0'
-                  }`}>
-                  {node.label}
-                  </div>
-
-                  {/* Enhanced pulse effect for large nodes */}
-                  {node.size === 'large' && (
-                    <div className={`absolute inset-0 rounded-full border-2 border-black transition-all duration-300 ${
-                      hoveredNode === node.id || selectedNode === node.id 
-                        ? 'animate-ping opacity-30' 
-                        : 'opacity-0'
-                    }`} />
-                  )}
-
-                  {/* Selection indicator */}
-                  {selectedNode === node.id && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-black rounded-full border-2 border-white" />
-                  )}
-                </div>
+        <MindMapDetailShell
+          open={selectedNode !== null}
+          title={nodes.find((n) => n.id === selectedNode)?.label ?? 'Node'}
+          onDismiss={clearSelection}
+          layout="dao-side"
+        >
+          {selectedNode === 'governance' && (
+            <>
+              <p className="text-sm text-gray-600">Core decision-making system for the DAO</p>
+              <div className="text-xs space-y-1">
+                <div>• Proposal creation and management</div>
+                <div>• Voting mechanisms</div>
+                <div>• Execution protocols</div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Node Details Panel */}
-        {selectedNode && (
-          <div className="absolute top-1/2 right-4 md:right-8 transform -translate-y-1/2 bg-white border-2 border-black p-4 md:p-6 max-w-xs md:max-w-sm animate-slide-up z-30 shadow-xl">
-            <h3 className="text-xl font-bold mb-4 font-serif">
-              {nodes.find(n => n.id === selectedNode)?.label}
-            </h3>
-            <div className="space-y-3">
-              {selectedNode === 'governance' && (
-                <>
-                  <p className="text-sm text-gray-600">Core decision-making system for the DAO</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Proposal creation and management</div>
-                    <div>• Voting mechanisms</div>
-                    <div>• Execution protocols</div>
-                  </div>
-                </>
-              )}
-              {selectedNode === 'treasury' && (
-                <>
-                  <p className="text-sm text-gray-600">Financial management and asset control</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Multi-signature wallet</div>
-                    <div>• Budget allocation</div>
-                    <div>• Investment decisions</div>
-                  </div>
-                </>
-              )}
-              {selectedNode === 'community' && (
-                <>
-                  <p className="text-sm text-gray-600">Member engagement and participation</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Member onboarding</div>
-                    <div>• Discussion forums</div>
-                    <div>• Reputation system</div>
-                  </div>
-                </>
-              )}
-              {selectedNode === 'token' && (
-                <>
-                  <p className="text-sm text-gray-600">Token economics and distribution</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Voting power allocation</div>
-                    <div>• Reward mechanisms</div>
-                    <div>• Token utility</div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+            </>
+          )}
+          {selectedNode === 'treasury' && (
+            <>
+              <p className="text-sm text-gray-600">Financial management and asset control</p>
+              <div className="text-xs space-y-1">
+                <div>• Multi-signature wallet</div>
+                <div>• Budget allocation</div>
+                <div>• Investment decisions</div>
+              </div>
+            </>
+          )}
+          {selectedNode === 'community' && (
+            <>
+              <p className="text-sm text-gray-600">Member engagement and participation</p>
+              <div className="text-xs space-y-1">
+                <div>• Member onboarding</div>
+                <div>• Discussion forums</div>
+                <div>• Reputation system</div>
+              </div>
+            </>
+          )}
+          {selectedNode === 'token' && (
+            <>
+              <p className="text-sm text-gray-600">Token economics and distribution</p>
+              <div className="text-xs space-y-1">
+                <div>• Voting power allocation</div>
+                <div>• Reward mechanisms</div>
+                <div>• Token utility</div>
+              </div>
+            </>
+          )}
+        </MindMapDetailShell>
 
         {/* Governance Flow Indicators */}
         <div className="absolute top-1/2 left-2 md:left-4 transform -translate-y-1/2 z-20 hidden md:block">
@@ -216,7 +135,7 @@ const DAOMindMap: React.FC<DAOMindMapProps> = ({ onClose }) => {
             {['Propose', 'Discuss', 'Vote', 'Execute'].map((step, index) => (
               <div key={step} className="flex items-center space-x-3 group cursor-pointer">
                 <div className={`w-8 h-8 rounded-full border-2 border-black bg-white flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:bg-black group-hover:text-white ${
-                  index === 0 ? 'animate-pulse' : ''
+                  index === 0 ? 'animate-pulse motion-reduce:animate-none' : ''
                 }`}>
                   {index + 1}
                 </div>
@@ -232,7 +151,7 @@ const DAOMindMap: React.FC<DAOMindMapProps> = ({ onClose }) => {
         </div>
 
         {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-bounce">
+        <div className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2 transform animate-bounce motion-reduce:animate-none">
           <div className="flex flex-col items-center text-center">
             <div className="text-sm font-semibold text-gray-600 mb-2">Scroll for more content</div>
             <div className="w-6 h-10 border-2 border-gray-400 rounded-full flex justify-center">

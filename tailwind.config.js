@@ -13,6 +13,7 @@ export default {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.8s ease-out',
         'scale-in': 'scaleIn 0.6s ease-out',
+        'draw-edge': 'drawEdge 0.85s ease-out forwards',
       },
       keyframes: {
         fadeIn: {
@@ -27,6 +28,13 @@ export default {
           '0%': { transform: 'scale(0.8)', opacity: '0' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
+        drawEdge: {
+          '0%': { strokeDashoffset: '100' },
+          '100%': { strokeDashoffset: '0' },
+        },
+      },
+      transitionProperty: {
+        'stroke': 'stroke, stroke-width, stroke-dashoffset, opacity',
       },
       backdropBlur: {
         xs: '2px',

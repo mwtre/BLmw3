@@ -1,6 +1,6 @@
 # MW3 - Meta Web 3.0 Ecosystem
 
-A comprehensive Web3 business consultation platform featuring interactive mind maps for DAO, DeFi, Trading, and NFT business verticals.
+A comprehensive Web3 business consultation platform featuring interactive mind maps for DAO, DeFi, Trading, and NFT business verticals, plus a **Profit** calendar (CoinGecko quotes, trade journal with local backup) and an **ART** media wall (YouTube / TikTok / X embeds).
 
 ## 🌐 Live Demo
 
@@ -9,6 +9,8 @@ A comprehensive Web3 business consultation platform featuring interactive mind m
 ## 🚀 Features
 
 - **Interactive Mind Maps**: Explore DAO, DeFi, Trading, and NFT ecosystems
+- **Profit calendar**: Day/week/month views, CoinGecko search, trades stored in the browser; export/import JSON backups
+- **ART wall**: Paste video or post links; embeds load when scrolled into view; export/import feed JSON
 - **Business-Focused Content**: Detailed use cases and pricing tiers
 - **Responsive Design**: Optimized for desktop and mobile
 - **Modern Tech Stack**: React + TypeScript + Vite + Tailwind CSS
@@ -49,6 +51,18 @@ A comprehensive Web3 business consultation platform featuring interactive mind m
 - Product certification and supply chain
 - Pricing: $0 - $20,000 packages
 
+### 5. Profit (calendar & journal)
+- Calendar navigation with day / week / month lenses
+- CoinGecko simple price lookup (cached requests)
+- Open/closed trades with optional notes; P/L math for closed legs
+- Data stays in `localStorage`; use **Export JSON** / **Import JSON** for backups
+- **Chart screenshot**: optional OCR on a chart image to guess prices and tickers — confirm fields before saving (not true computer vision on drawings)
+
+### 6. ART (media wall)
+- Add YouTube, TikTok, or X (Twitter) links
+- Embeds load lazily when near the viewport
+- Feed persisted locally with JSON export/import
+
 ## 🛠️ Development
 
 ### Prerequisites
@@ -70,6 +84,11 @@ npm run dev
 ### Build for Production
 ```bash
 npm run build
+```
+
+### Tests
+```bash
+npm test
 ```
 
 ### Preview Production Build

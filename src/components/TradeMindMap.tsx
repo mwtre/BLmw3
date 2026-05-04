@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
-import { X, TrendingUp, TrendingDown, BarChart2, Activity, Target, Zap, DollarSign, Percent, ArrowUpDown, LineChart, PieChart, Users, Shield, FileText } from 'lucide-react';
+import React from 'react';
+import { TrendingUp, TrendingDown, BarChart2, Activity, Target, Zap, DollarSign, Percent, ArrowUpDown, LineChart, PieChart, Users, Shield } from 'lucide-react';
+import { useMindMapInteraction } from '../hooks/useMindMapInteraction';
+import MindMapCloseButton from './mind-map/MindMapCloseButton';
+import MindMapDetailShell from './mind-map/MindMapDetailShell';
+import MindMapGraph from './mind-map/MindMapGraph';
+import type { MindMapNode } from '../types/mindMap';
 
 interface TradeMindMapProps {
   onClose: () => void;
 }
 
 const TradeMindMap: React.FC<TradeMindMapProps> = ({ onClose }) => {
-  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const {
+    hoveredNode,
+    setHoveredNode,
+    selectedNode,
+    toggleSelectNode,
+    clearSelection,
+    expandedCard,
+    setExpandedCard,
+  } = useMindMapInteraction();
 
-  const nodes = [
+  const nodes: MindMapNode[] = [
     // Core trading types
     { id: 'spot', icon: TrendingUp, label: 'Spot Trading', x: 20, y: 20, size: 'large', connections: ['orderbook', 'market', 'limit'] },
     { id: 'futures', icon: TrendingDown, label: 'Futures', x: 80, y: 20, size: 'large', connections: ['leverage', 'margin', 'funding'] },
@@ -41,24 +52,9 @@ const TradeMindMap: React.FC<TradeMindMapProps> = ({ onClose }) => {
     { id: 'stop', icon: ArrowUpDown, label: 'Stop Loss', x: 40, y: 80, size: 'small', connections: ['risk'] }
   ];
 
-  const getSizeClass = (size: string) => {
-    switch (size) {
-      case 'large': return 'w-16 h-16 p-4';
-      case 'medium': return 'w-12 h-12 p-3';
-      case 'small': return 'w-10 h-10 p-2';
-      default: return 'w-12 h-12 p-3';
-    }
-  };
-
   return (
     <div className="w-full h-screen bg-white overflow-y-auto">
-      {/* Close Button */}
-      <button
-        onClick={onClose}
-        className="fixed top-4 right-4 z-50 p-2 rounded-full bg-white border-2 border-black hover:bg-black hover:text-white transition-colors shadow-lg"
-      >
-        <X className="w-5 h-5" />
-      </button>
+      <MindMapCloseButton onClose={onClose} />
 
       {/* Header Section */}
       <div className="w-full pt-16 pb-8 px-4">
@@ -79,150 +75,64 @@ const TradeMindMap: React.FC<TradeMindMapProps> = ({ onClose }) => {
 
       {/* Mind Map Container */}
       <div className="w-full px-4 mb-8">
-        <div className="relative w-full max-w-6xl h-[400px] sm:h-[500px] md:h-[600px] mx-auto">
-        {/* Connection Lines */}
-        <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
-          <defs>
-            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill="black" opacity="0.3" />
-            </marker>
-          </defs>
-          
-          {nodes.map((node) =>
-            node.connections.map((connId) => {
-              const connectedNode = nodes.find(n => n.id === connId);
-              if (!connectedNode) return null;
-                
-                const isHighlighted = hoveredNode === node.id || hoveredNode === connId;
-                const isSelected = selectedNode === node.id || selectedNode === connId;
-              
-              return (
-                <g key={`${node.id}-${connId}`}>
-                  <line
-                    x1={`${node.x}%`}
-                    y1={`${node.y}%`}
-                    x2={`${connectedNode.x}%`}
-                    y2={`${connectedNode.y}%`}
-                      stroke={isHighlighted ? "black" : "black"}
-                      strokeWidth={isHighlighted ? "2" : "1"}
-                      opacity={isHighlighted ? "0.6" : isSelected ? "0.4" : "0.2"}
-                      strokeDasharray={isHighlighted ? "0" : "5,5"}
-                      className="transition-all duration-300"
-                    markerEnd="url(#arrowhead)"
-                  />
-                </g>
-              );
-            })
-          )}
-        </svg>
-
-        {/* Nodes */}
-        {nodes.map((node, index) => (
-          <div
-            key={node.id}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out animate-scale-in`}
-            style={{
-              left: `${node.x}%`,
-              top: `${node.y}%`,
-              zIndex: 10,
-                animationDelay: `${index * 100}ms`
-              }}
-            >
-              <div 
-                className="group cursor-pointer relative"
-                onMouseEnter={() => setHoveredNode(node.id)}
-                onMouseLeave={() => setHoveredNode(null)}
-                onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
-                style={{ padding: '40px 20px 50px 20px' }}
-              >
-                <div className={`relative ${getSizeClass(node.size)} rounded-full border-2 transition-all duration-500 hover:scale-110 hover:shadow-xl flex items-center justify-center ${
-                  selectedNode === node.id 
-                    ? 'border-black bg-black text-white shadow-2xl scale-110' 
-                    : hoveredNode === node.id
-                    ? 'border-black bg-black text-white shadow-xl'
-                    : 'border-black bg-white hover:bg-black hover:text-white'
-              }`}>
-                <node.icon className="transition-colors" />
-                </div>
-                
-                {/* Node label - positioned within the hover area */}
-                <div className={`absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-semibold tracking-wider transition-opacity duration-500 whitespace-nowrap ${
-                  hoveredNode === node.id || selectedNode === node.id ? 'opacity-100' : 'opacity-0'
-                }`}>
-                  {node.label}
-                </div>
-
-                {/* Enhanced pulse effect for large nodes */}
-                {node.size === 'large' && (
-                  <div className={`absolute inset-0 rounded-full border-2 border-black transition-all duration-300 ${
-                    hoveredNode === node.id || selectedNode === node.id 
-                      ? 'animate-ping opacity-30' 
-                      : 'opacity-0'
-                  }`} />
-                )}
-
-                {/* Selection indicator */}
-                {selectedNode === node.id && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-black rounded-full border-2 border-white" />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <MindMapGraph
+          nodes={nodes}
+          containerClassName="h-[400px] sm:h-[500px] md:h-[600px]"
+          hoveredNode={hoveredNode}
+          selectedNode={selectedNode}
+          onHoverNode={setHoveredNode}
+          onToggleSelectNode={toggleSelectNode}
+          edgeStyle="arrow"
+          nodeInteractionStyle={{ padding: '40px 20px 50px 20px' }}
+        />
       </div>
 
-      {/* Node Details Panel */}
-      {selectedNode && (
-        <div className="w-full px-4 mb-8">
-          <div className="max-w-4xl mx-auto bg-white border-2 border-black p-4 md:p-6 animate-slide-up shadow-xl">
-            <h3 className="text-xl font-bold mb-4 font-serif">
-              {nodes.find(n => n.id === selectedNode)?.label}
-            </h3>
-            <div className="space-y-3">
-              {selectedNode === 'spot' && (
-                <>
-                  <p className="text-sm text-gray-600">Immediate cryptocurrency trading at current market prices</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Direct asset ownership</div>
-                    <div>• Market and limit orders</div>
-                    <div>• Real-time price execution</div>
-                  </div>
-                </>
-              )}
-              {selectedNode === 'futures' && (
-                <>
-                  <p className="text-sm text-gray-600">Trade cryptocurrency contracts with leverage</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Leveraged positions</div>
-                    <div>• Margin trading</div>
-                    <div>• Settlement dates</div>
-                  </div>
-                </>
-              )}
-              {selectedNode === 'portfolio' && (
-                <>
-                  <p className="text-sm text-gray-600">Comprehensive portfolio management and tracking</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Asset allocation</div>
-                    <div>• Performance analytics</div>
-                    <div>• Risk assessment</div>
-                  </div>
-                </>
-              )}
-              {selectedNode === 'analytics' && (
-                <>
-                  <p className="text-sm text-gray-600">Advanced trading analytics and insights</p>
-                  <div className="text-xs space-y-1">
-                    <div>• Technical indicators</div>
-                    <div>• Market analysis</div>
-                    <div>• Performance metrics</div>
-                  </div>
-                </>
-              )}
+      <MindMapDetailShell
+        open={selectedNode !== null}
+        title={nodes.find((n) => n.id === selectedNode)?.label ?? 'Node'}
+        onDismiss={clearSelection}
+      >
+        {selectedNode === 'spot' && (
+          <>
+            <p className="text-sm text-gray-600">Immediate cryptocurrency trading at current market prices</p>
+            <div className="text-xs space-y-1">
+              <div>• Direct asset ownership</div>
+              <div>• Market and limit orders</div>
+              <div>• Real-time price execution</div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+        {selectedNode === 'futures' && (
+          <>
+            <p className="text-sm text-gray-600">Trade cryptocurrency contracts with leverage</p>
+            <div className="text-xs space-y-1">
+              <div>• Leveraged positions</div>
+              <div>• Margin trading</div>
+              <div>• Settlement dates</div>
+            </div>
+          </>
+        )}
+        {selectedNode === 'portfolio' && (
+          <>
+            <p className="text-sm text-gray-600">Comprehensive portfolio management and tracking</p>
+            <div className="text-xs space-y-1">
+              <div>• Asset allocation</div>
+              <div>• Performance analytics</div>
+              <div>• Risk assessment</div>
+            </div>
+          </>
+        )}
+        {selectedNode === 'analytics' && (
+          <>
+            <p className="text-sm text-gray-600">Advanced trading analytics and insights</p>
+            <div className="text-xs space-y-1">
+              <div>• Technical indicators</div>
+              <div>• Market analysis</div>
+              <div>• Performance metrics</div>
+            </div>
+          </>
+        )}
+      </MindMapDetailShell>
 
       {/* Trading Flow Indicators */}
       <div className="w-full px-4 mb-8">
@@ -232,7 +142,7 @@ const TradeMindMap: React.FC<TradeMindMapProps> = ({ onClose }) => {
             {['Analyze', 'Execute', 'Monitor', 'Optimize'].map((step, index) => (
               <div key={step} className="flex items-center space-x-3 group cursor-pointer">
                 <div className={`w-8 h-8 rounded-full border-2 border-black bg-white flex items-center justify-center text-xs font-bold transition-all duration-300 group-hover:bg-black group-hover:text-white ${
-                  index === 0 ? 'animate-pulse' : ''
+                  index === 0 ? 'animate-pulse motion-reduce:animate-none' : ''
                 }`}>
                   {index + 1}
                 </div>
@@ -250,7 +160,7 @@ const TradeMindMap: React.FC<TradeMindMapProps> = ({ onClose }) => {
 
       {/* Scroll Indicator */}
       <div className="w-full px-4 mb-8">
-        <div className="max-w-4xl mx-auto text-center animate-bounce">
+        <div className="mx-auto max-w-4xl text-center animate-bounce motion-reduce:animate-none">
           <div className="text-sm font-semibold text-gray-600 mb-2">Scroll for more content</div>
           <div className="w-6 h-10 border-2 border-gray-400 rounded-full flex justify-center mx-auto">
             <div className="w-1 h-3 bg-gray-400 rounded-full mt-2 animate-pulse"></div>
