@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { ProfitTrade, TradeStatus } from '../types/trade';
 import {
@@ -56,13 +56,6 @@ export function useTradesStorage() {
   }, [allTrades]);
 
   const clearStorageError = useCallback(() => setStorageError(null), []);
-
-  /** Large merge results after sync should not block login paint / input. */
-  const applySyncMerge = useCallback((next: ProfitTrade[]) => {
-    startTransition(() => {
-      setAllTrades(next);
-    });
-  }, []);
 
   const addTrade = useCallback((t: Omit<ProfitTrade, 'id'>) => {
     const ts = nowIso();
@@ -162,7 +155,7 @@ export function useTradesStorage() {
     try {
       const timeoutMs = 12_000;
       const res = await Promise.race<{ status: SyncStatus; error?: string }>([
-        syncTradesOnce(() => allTradesRef.current, applySyncMerge),
+        syncTradesOnce(() => allTradesRef.current, setAllTrades),
         new Promise((resolve) =>
           globalThis.setTimeout(
             () => resolve({ status: 'error', error: `Sync timed out after ${timeoutMs / 1000}s` }),

@@ -35,9 +35,13 @@ function mergeTrades(local: ProfitTrade[], remote: ProfitTrade[]): ProfitTrade[]
   return [...map.values()];
 }
 
+export type SetTradesFn = (
+  nextOrUpdater: ProfitTrade[] | ((prev: ProfitTrade[]) => ProfitTrade[])
+) => void;
+
 export async function syncTradesOnce(
   getCurrent: () => ProfitTrade[],
-  setNext: (next: ProfitTrade[]) => void
+  setNext: SetTradesFn
 ): Promise<{ status: SyncStatus; error?: string }> {
   if (!supabaseEnabled || !supabase) return { status: 'disabled' };
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'offline' };
@@ -47,7 +51,6 @@ export async function syncTradesOnce(
     const user = sessionData.session?.user;
     const admin = isAdminSession(user);
 
-    const current = getCurrent();
     const lastPull = (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PULL)) || null;
     const lastPush = (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PUSH)) || null;
 
@@ -96,16 +99,19 @@ export async function syncTradesOnce(
     // Bootstrap: remote has zero rows but local has trades. Older builds could set last_push watermarks
     // during pull-only syncs, preventing upload — reset markers so we do a full upsert once.
     if (admin) {
-      const localHasRows = current.some((t) => !t.deletedAt);
+      const localHasRows = getCurrent().some((t) => !t.deletedAt);
       if (remoteRows.length === 0 && localHasRows && typeof localStorage !== 'undefined') {
         localStorage.removeItem(LS_LAST_PUSH);
         localStorage.removeItem(LS_LAST_PULL);
       }
     }
 
-    // Always merge so local-only rows (e.g. viewer-added trades) survive pull; non-admins still skip push below.
-    const merged = mergeTrades(current, remoteTrades);
-    setNext(merged);
+    // Merge against latest React state (not a snapshot from sync start) so trades added during sync are kept.
+    let merged: ProfitTrade[] = [];
+    setNext((prev) => {
+      merged = mergeTrades(prev, remoteTrades);
+      return merged;
+    });
 
     // bump last pull watermark
     if (admin && typeof localStorage !== 'undefined' && remoteRows.length > 0) {

@@ -19,6 +19,7 @@ import {
 import {
   fetchSimpleUsdPrices,
   formatCoingeckoError,
+  normalizeToPaprikaCoinId,
   POPULAR_COIN_IDS,
   searchCoins,
 } from '../lib/coingecko';
@@ -209,7 +210,9 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       try {
         const data = await fetchSimpleUsdPrices([priceCoinId], ac.signal);
         if (ac.signal.aborted) return;
-        const p = data[priceCoinId]?.usd;
+        const keyRaw = priceCoinId.trim();
+        const keyNorm = normalizeToPaprikaCoinId(priceCoinId);
+        const p = data[keyRaw]?.usd ?? (keyNorm !== keyRaw ? data[keyNorm]?.usd : undefined);
         setLivePrice(p ?? null);
         if (p != null) setEntryPrice(String(p));
       } catch (e: unknown) {
