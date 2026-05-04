@@ -7,6 +7,9 @@ export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error'
 const LS_LAST_PULL = 'mw3-supabase-trades-last-pull';
 const LS_LAST_PUSH = 'mw3-supabase-trades-last-push';
 
+/** Cap rows per pull so public “full ledger” reads cannot freeze the browser on huge tables. */
+const MAX_PUBLIC_PULL_ROWS = 10_000;
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -62,8 +65,8 @@ export async function syncTradesOnce(
         if (res.error) throw new Error(res.error.message);
         remoteRows = res.data ?? [];
       } else {
-        // Public read: RLS allows select for everyone; viewers should see the full published ledger.
-        const res = await q;
+        // Public read: RLS allows select for everyone; cap rows so login/sync stays responsive.
+        const res = await q.limit(MAX_PUBLIC_PULL_ROWS);
         if (res.error) throw new Error(res.error.message);
         remoteRows = res.data ?? [];
       }

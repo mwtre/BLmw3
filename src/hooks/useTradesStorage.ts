@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { ProfitTrade, TradeStatus } from '../types/trade';
 import {
@@ -42,12 +42,27 @@ export function useTradesStorage() {
   const syncErrorRef = useRef<string | null>(null);
   syncErrorRef.current = syncError;
 
+  const saveDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const { ok, error } = saveTrades(allTrades);
-    setStorageError(ok ? null : error ?? 'Save failed');
+    if (saveDebounce.current) window.clearTimeout(saveDebounce.current);
+    saveDebounce.current = window.setTimeout(() => {
+      saveDebounce.current = null;
+      const { ok, error } = saveTrades(allTrades);
+      setStorageError(ok ? null : error ?? 'Save failed');
+    }, 200);
+    return () => {
+      if (saveDebounce.current) window.clearTimeout(saveDebounce.current);
+    };
   }, [allTrades]);
 
   const clearStorageError = useCallback(() => setStorageError(null), []);
+
+  /** Large merge results after sync should not block login paint / input. */
+  const applySyncMerge = useCallback((next: ProfitTrade[]) => {
+    startTransition(() => {
+      setAllTrades(next);
+    });
+  }, []);
 
   const addTrade = useCallback((t: Omit<ProfitTrade, 'id'>) => {
     const ts = nowIso();
@@ -147,7 +162,7 @@ export function useTradesStorage() {
     try {
       const timeoutMs = 12_000;
       const res = await Promise.race<{ status: SyncStatus; error?: string }>([
-        syncTradesOnce(() => allTradesRef.current, setAllTrades),
+        syncTradesOnce(() => allTradesRef.current, applySyncMerge),
         new Promise((resolve) =>
           globalThis.setTimeout(
             () => resolve({ status: 'error', error: `Sync timed out after ${timeoutMs / 1000}s` }),
@@ -197,9 +212,14 @@ export function useTradesStorage() {
       setSyncStatus('signed_out');
       return;
     }
-    void syncNow();
+    // Defer sync so auth UI / OAuth redirect can paint before heavy pull + merge + localStorage.
+    const kick = window.setTimeout(() => {
+      void syncNow();
+    }, 0);
     // Periodic sync for admins only (guest/public reads sync on mount + manual refresh).
-    if (!admin) return;
+    if (!admin) {
+      return () => window.clearTimeout(kick);
+    }
     const intervalMs = 120_000;
     const t = window.setInterval(() => {
       if (syncInFlight.current) return;
@@ -207,7 +227,10 @@ export function useTradesStorage() {
       if (syncErrorRef.current) return;
       void syncNow();
     }, intervalMs);
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearTimeout(kick);
+      window.clearInterval(t);
+    };
   }, [syncNow, authSession]);
 
   return {
