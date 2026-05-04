@@ -21,6 +21,10 @@ export function useTradesStorage() {
   const [allTrades, setAllTrades] = useState<ProfitTrade[]>(() =>
     typeof window !== 'undefined' ? loadTrades() : []
   );
+  const allTradesRef = useRef<ProfitTrade[]>(allTrades);
+  useEffect(() => {
+    allTradesRef.current = allTrades;
+  }, [allTrades]);
   const trades = allTrades.filter((t) => !t.deletedAt);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
@@ -109,7 +113,7 @@ export function useTradesStorage() {
     try {
       const timeoutMs = 12_000;
       const res = await Promise.race<{ status: SyncStatus; error?: string }>([
-        syncTradesOnce(allTrades, setAllTrades),
+        syncTradesOnce(() => allTradesRef.current, setAllTrades),
         new Promise((resolve) =>
           globalThis.setTimeout(
             () => resolve({ status: 'error', error: `Sync timed out after ${timeoutMs / 1000}s` }),
@@ -127,7 +131,7 @@ export function useTradesStorage() {
     } finally {
       syncInFlight.current = false;
     }
-  }, [allTrades]);
+  }, []);
 
   useEffect(() => {
     if (syncWatchdog.current) {

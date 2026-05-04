@@ -39,7 +39,7 @@ async function ensureAnonSession() {
 }
 
 export async function syncTradesOnce(
-  current: ProfitTrade[],
+  getCurrent: () => ProfitTrade[],
   setNext: (next: ProfitTrade[]) => void
 ): Promise<{ status: SyncStatus; error?: string }> {
   if (!supabaseEnabled || !supabase) return { status: 'disabled' };
@@ -51,6 +51,7 @@ export async function syncTradesOnce(
     const user = sessionData.session?.user;
     if (!user) return { status: 'error', error: 'No Supabase session' };
 
+    const current = getCurrent();
     const lastPull = (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PULL)) || null;
     const lastPush = (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PUSH)) || null;
 

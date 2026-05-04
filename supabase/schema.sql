@@ -34,6 +34,13 @@ for update
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
+-- Client uses PostgREST upsert (ON CONFLICT), which can require delete permissions for internal conflict handling.
+drop policy if exists "trades_delete_own" on public.trades;
+create policy "trades_delete_own"
+on public.trades
+for delete
+using (auth.uid() = user_id);
+
 -- Share snapshots: private by default, but readable by anyone who has the id if you enable the public policy.
 create table if not exists public.share_snapshots (
   id text primary key,
