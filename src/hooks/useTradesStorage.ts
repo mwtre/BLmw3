@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProfitTrade, TradeStatus } from '../types/trade';
 import {
   buildTradesExport,
@@ -27,6 +27,7 @@ export function useTradesStorage() {
     supabaseEnabled ? 'syncing' : 'disabled'
   );
   const [syncError, setSyncError] = useState<string | null>(null);
+  const syncInFlight = useRef(false);
 
   useEffect(() => {
     const { ok, error } = saveTrades(allTrades);
@@ -100,10 +101,18 @@ export function useTradesStorage() {
 
   const syncNow = useCallback(async () => {
     if (!supabaseEnabled) return;
+    if (syncInFlight.current) return;
+    syncInFlight.current = true;
     setSyncStatus('syncing');
-    const res = await syncTradesOnce(allTrades, setAllTrades);
+    const res = await Promise.race<{ status: SyncStatus; error?: string }>([
+      syncTradesOnce(allTrades, setAllTrades),
+      new Promise((resolve) =>
+        window.setTimeout(() => resolve({ status: 'error', error: 'Sync timed out' }), 12_000)
+      ),
+    ]);
     setSyncStatus(res.status);
     setSyncError(res.status === 'error' ? res.error ?? 'Sync failed' : null);
+    syncInFlight.current = false;
   }, [allTrades]);
 
   useEffect(() => {
