@@ -1,4 +1,24 @@
 const BASE = 'https://api.coingecko.com/api/v3';
+const PROXY_BASE =
+  (import.meta.env.VITE_CORS_PROXY_BASE as string | undefined) ?? 'https://api.allorigins.win/raw?url=';
+
+async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  try {
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return (await res.json()) as T;
+  } catch (e) {
+    // Common in GitHub Pages + browser environments when an upstream blocks CORS.
+    const shouldProxy =
+      e instanceof TypeError ||
+      (e instanceof Error && /cors|failed to fetch/i.test(e.message));
+    if (!shouldProxy) throw e;
+    const proxied = `${PROXY_BASE}${encodeURIComponent(url)}`;
+    const res2 = await fetch(proxied, { signal });
+    if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
+    return (await res2.json()) as T;
+  }
+}
 
 /** Dedupe rapid repeats (free tier friendly). */
 const PRICE_CACHE_TTL_MS = 45_000;
@@ -27,11 +47,10 @@ export async function fetchSimpleUsdPrices(
     ids: [...new Set(coinIds)].join(','),
     vs_currencies: 'usd',
   });
-  const res = await fetch(`${BASE}/simple/price?${params}`, { signal });
-  if (!res.ok) {
-    throw new Error(`CoinGecko price error ${res.status}`);
-  }
-  const data = (await res.json()) as Record<string, { usd?: number }>;
+  const data = await fetchJson<Record<string, { usd?: number }>>(
+    `${BASE}/simple/price?${params}`,
+    signal
+  );
   priceCache.set(key, { at: now, data });
   return data;
 }
@@ -42,13 +61,9 @@ export async function searchCoins(
 ): Promise<{ id: string; symbol: string; name: string; thumb?: string }[]> {
   const q = query.trim();
   if (q.length < 1) return [];
-  const res = await fetch(`${BASE}/search?query=${encodeURIComponent(q)}`, { signal });
-  if (!res.ok) {
-    throw new Error(`CoinGecko search error ${res.status}`);
-  }
-  const data = (await res.json()) as {
+  const data = await fetchJson<{
     coins?: { id: string; symbol: string; name: string; thumb: string }[];
-  };
+  }>(`${BASE}/search?query=${encodeURIComponent(q)}`, signal);
   return (data.coins ?? []).slice(0, 20);
 }
 
