@@ -43,6 +43,16 @@ import type { ProfitTrade } from '../types/trade';
 
 type CalMode = 'day' | 'week' | 'month';
 
+function fmtUsdCell(n: unknown): string {
+  const x = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(x) ? `$${x.toFixed(2)}` : '—';
+}
+
+function fmtQtyCell(n: unknown): string {
+  const x = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(x) ? x.toLocaleString() : '—';
+}
+
 const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
 
 function parsePlanTarget(notes: string): number | null {
@@ -248,7 +258,13 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
 
   useEffect(() => {
     if (readOnly) return;
-    const ids = [...new Set(openTrades.map((t) => t.coinGeckoId))];
+    const ids = [
+      ...new Set(
+        openTrades
+          .map((t) => t.coinGeckoId)
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+      ),
+    ];
     if (ids.length === 0) {
       setOpenPrices({});
       return;
@@ -358,7 +374,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     const planNote = Number.isFinite(pt) ? `Plan target: ${pt}` : '';
     const mergedNotes = [notes.trim(), planNote].filter(Boolean).join(' · ');
     addTrade({
-      coinGeckoId: priceCoinId,
+      coinGeckoId:
+        typeof priceCoinId === 'string' && priceCoinId.trim() ? priceCoinId.trim() : 'btc-bitcoin',
       symbol: symbolLabel,
       openedAt: new Date(openedAt).toISOString(),
       closedAt: null,
@@ -770,6 +787,9 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               onChange={(e) => setPriceCoinId(e.target.value)}
               className="rounded border-2 border-black bg-white px-3 py-2 text-sm"
             >
+              {!POPULAR_COIN_IDS.some((c) => c.id === priceCoinId) && priceCoinId ? (
+                <option value={priceCoinId}>{symbolLabel}</option>
+              ) : null}
               {POPULAR_COIN_IDS.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
@@ -1129,21 +1149,36 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 </thead>
                 <tbody>
                   {openTrades.map((t) => {
-                    const live = openPrices[t.coinGeckoId] ?? null;
+                    const live = openPrices[t.coinGeckoId ?? ''] ?? null;
                     const target = parsePlanTarget(t.notes);
-                    const pct =
-                      live == null || t.entryPrice === 0
-                        ? null
-                        : t.position === 'long'
-                          ? ((live - t.entryPrice) / t.entryPrice) * 100
-                          : ((t.entryPrice - live) / t.entryPrice) * 100;
-                    const pnlUsd = pct == null ? null : (pct / 100) * t.quantity;
-                    const progress =
-                      live == null || target == null || target === t.entryPrice
-                        ? null
-                        : t.position === 'long'
-                          ? (live - t.entryPrice) / (target - t.entryPrice)
-                          : (t.entryPrice - live) / (t.entryPrice - target);
+                    const ep = Number(t.entryPrice);
+                    const entryOk = Number.isFinite(ep) && ep !== 0;
+                    const qtyN = Number(t.quantity);
+                    const qtyOk = Number.isFinite(qtyN);
+                    let pct: number | null = null;
+                    if (live != null && entryOk && Number.isFinite(live)) {
+                      const p =
+                        t.position === 'long'
+                          ? ((live - ep) / ep) * 100
+                          : ((ep - live) / ep) * 100;
+                      pct = Number.isFinite(p) ? p : null;
+                    }
+                    const pnlUsd =
+                      pct != null && qtyOk ? (pct / 100) * qtyN : null;
+                    let progress: number | null = null;
+                    if (
+                      live != null &&
+                      target != null &&
+                      entryOk &&
+                      Number.isFinite(live) &&
+                      target !== ep
+                    ) {
+                      const raw =
+                        t.position === 'long'
+                          ? (live - ep) / (target - ep)
+                          : (ep - live) / (ep - target);
+                      progress = Number.isFinite(raw) ? raw : null;
+                    }
                     const progClamped = progress == null ? null : Math.max(0, Math.min(1, progress));
                     return (
                       <tr key={t.id} className="border-t border-gray-200 odd:bg-gray-50">
@@ -1154,11 +1189,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                         <td className="px-3 py-2 whitespace-nowrap">
                           {new Date(t.openedAt).toLocaleString()}
                         </td>
-                        <td className="px-3 py-2">${t.entryPrice.toFixed(2)}</td>
+                        <td className="px-3 py-2">{fmtUsdCell(t.entryPrice)}</td>
                         <td className="px-3 py-2">{target != null ? `$${target.toFixed(2)}` : '—'}</td>
                         <td className="px-3 py-2">{live != null ? `$${live.toFixed(2)}` : '—'}</td>
                         <td className="px-3 py-2 font-semibold">
-                          {pnlUsd != null ? (
+                          {pnlUsd != null && Number.isFinite(pnlUsd) ? (
                             <span className={pnlUsd >= 0 ? 'text-green-700' : 'text-red-700'}>
                               {pnlUsd >= 0 ? '+' : ''}
                               {pnlUsd.toFixed(2)}
@@ -1168,7 +1203,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                           )}
                         </td>
                         <td className="px-3 py-2 font-semibold">
-                          {pct != null ? (
+                          {pct != null && Number.isFinite(pct) ? (
                             <span className={pct >= 0 ? 'text-green-700' : 'text-red-700'}>
                               {pct >= 0 ? '+' : ''}
                               {pct.toFixed(2)}%
@@ -1192,7 +1227,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                             </div>
                           )}
                         </td>
-                        <td className="px-3 py-2">${t.quantity.toLocaleString()}</td>
+                        <td className="px-3 py-2">{fmtQtyCell(t.quantity)}</td>
                         <td className="px-3 py-2 text-right">
                           {t.sourceUrl && (
                             <a
@@ -1223,9 +1258,14 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                                 onClick={() => {
                                   setCloseTarget(t);
                                   setCloseExit('');
-                                  fetchSimpleUsdPrices([t.coinGeckoId])
+                                  const cid =
+                                    typeof t.coinGeckoId === 'string' && t.coinGeckoId.trim()
+                                      ? t.coinGeckoId
+                                      : '';
+                                  if (!cid) return;
+                                  fetchSimpleUsdPrices([cid])
                                     .then((data) => {
-                                      const p = data[t.coinGeckoId]?.usd;
+                                      const p = data[cid]?.usd;
                                       if (p != null) setCloseExit(String(p));
                                     })
                                     .catch(() => {});
@@ -1299,11 +1339,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                         <td className="px-3 py-2 whitespace-nowrap">
                           {t.closedAt ? new Date(t.closedAt).toLocaleString() : '—'}
                         </td>
-                        <td className="px-3 py-2">${t.entryPrice.toFixed(2)}</td>
+                        <td className="px-3 py-2">{fmtUsdCell(t.entryPrice)}</td>
                         <td className="px-3 py-2">
-                          {t.exitPrice != null ? `$${t.exitPrice.toFixed(2)}` : '—'}
+                          {t.exitPrice != null ? fmtUsdCell(t.exitPrice) : '—'}
                         </td>
-                        <td className="px-3 py-2">${t.quantity.toLocaleString()}</td>
+                        <td className="px-3 py-2">{fmtQtyCell(t.quantity)}</td>
                         <td className="px-3 py-2 font-semibold">
                           {pnl != null ? (
                             <span className={pnl >= 0 ? 'text-green-700' : 'text-red-700'}>

@@ -65,8 +65,10 @@ export function formatCoingeckoError(err: unknown): string {
   return err.message;
 }
 
-export function normalizeToPaprikaCoinId(id: string): string {
+export function normalizeToPaprikaCoinId(id: string | null | undefined): string {
+  if (id == null || typeof id !== 'string') return '';
   const t = id.trim().toLowerCase();
+  if (!t) return '';
   return LEGACY_COINGECKO_TO_PAPRICA[t] ?? t;
 }
 
@@ -122,8 +124,11 @@ export async function fetchSimpleUsdPrices(
   coinIds: string[],
   signal?: AbortSignal
 ): Promise<Record<string, { usd?: number }>> {
-  if (coinIds.length === 0) return {};
-  const key = priceCacheKey(coinIds);
+  const cleaned = coinIds.filter(
+    (id): id is string => typeof id === 'string' && id.trim().length > 0
+  );
+  if (cleaned.length === 0) return {};
+  const key = priceCacheKey(cleaned);
   const now = Date.now();
   const hit = priceCache.get(key);
   if (hit && now - hit.at < PRICE_CACHE_TTL_MS) {
@@ -134,8 +139,10 @@ export async function fetchSimpleUsdPrices(
   if (existing) return existing;
 
   const p = (async () => {
-    const uniqueRaw = [...new Set(coinIds)];
-    const pairs = uniqueRaw.map((raw) => ({ raw, paprika: normalizeToPaprikaCoinId(raw) }));
+    const uniqueRaw = [...new Set(cleaned)];
+    const pairs = uniqueRaw
+      .map((raw) => ({ raw, paprika: normalizeToPaprikaCoinId(raw) }))
+      .filter((p) => p.paprika.length > 0);
     const uniquePaprika = [...new Set(pairs.map((p) => p.paprika))];
 
     const tickerByPaprika = new Map<string, PaprikaTicker>();
