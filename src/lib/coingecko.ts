@@ -1,23 +1,76 @@
 const BASE = 'https://api.coingecko.com/api/v3';
-const PROXY_BASE =
-  (import.meta.env.VITE_CORS_PROXY_BASE as string | undefined) ?? 'https://api.allorigins.win/raw?url=';
+
+/** User-defined prefix; target URL is appended as encoded query value (e.g. …/raw?url=). */
+const CUSTOM_PROXY_BASE =
+  (import.meta.env.VITE_CORS_PROXY_BASE as string | undefined)?.trim() ?? '';
+
+function isBrowserLocalhost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+}
+
+/**
+ * CoinGecko does not send CORS headers for browser origins (e.g. GitHub Pages).
+ * Try several public proxies; users can set VITE_CORS_PROXY_BASE to their own worker.
+ */
+function proxyUrlsFor(targetUrl: string): string[] {
+  const encoded = encodeURIComponent(targetUrl);
+  const urls: string[] = [];
+  if (CUSTOM_PROXY_BASE) {
+    urls.push(`${CUSTOM_PROXY_BASE}${encoded}`);
+  }
+  // CodeTabs proxy returns JSON with CORS * (reliable for static hosting).
+  urls.push(`https://api.codetabs.com/v1/proxy/?quest=${encoded}`);
+  // corsproxy.io — may 403 from some networks; keep as middle fallback.
+  urls.push(`https://corsproxy.io/?${encoded}`);
+  urls.push(`https://api.allorigins.win/raw?url=${encoded}`);
+  urls.push(`https://api.allorigins.win/get?url=${encoded}`);
+  return urls;
+}
+
+async function parseProxyResponse(res: Response, requestUrl: string): Promise<unknown> {
+  const text = await res.text();
+  if (!text) throw new Error('Empty response body');
+  if (requestUrl.includes('api.allorigins.win/get')) {
+    const wrapped = JSON.parse(text) as { contents?: string };
+    if (typeof wrapped.contents !== 'string') throw new Error('Invalid allorigins get payload');
+    return JSON.parse(wrapped.contents) as unknown;
+  }
+  return JSON.parse(text) as unknown;
+}
+
+function throwIfCoingeckoErrorPayload(data: unknown): void {
+  if (!data || typeof data !== 'object') return;
+  if (!('status' in data)) return;
+  const st = (data as { status?: { error_code?: number; error_message?: string } }).status;
+  if (st && typeof st.error_code === 'number' && st.error_code !== 0) {
+    throw new Error(st.error_message ?? `CoinGecko error ${st.error_code}`);
+  }
+}
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
-  try {
-    const res = await fetch(url, { signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return (await res.json()) as T;
-  } catch (e) {
-    // Common in GitHub Pages + browser environments when an upstream blocks CORS.
-    const shouldProxy =
-      e instanceof TypeError ||
-      (e instanceof Error && /cors|failed to fetch/i.test(e.message));
-    if (!shouldProxy) throw e;
-    const proxied = `${PROXY_BASE}${encodeURIComponent(url)}`;
-    const res2 = await fetch(proxied, { signal });
-    if (!res2.ok) throw new Error(`HTTP ${res2.status}`);
-    return (await res2.json()) as T;
+  const directFirst = isBrowserLocalhost();
+  const attempts = directFirst
+    ? [url, ...proxyUrlsFor(url)]
+    : [...proxyUrlsFor(url), url];
+
+  let lastErr: unknown;
+  for (const attemptUrl of attempts) {
+    try {
+      const res = await fetch(attemptUrl, { signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await parseProxyResponse(res, attemptUrl)) as T;
+      throwIfCoingeckoErrorPayload(data);
+      return data;
+    } catch (e) {
+      lastErr = e;
+      const msg = e instanceof Error ? e.message : String(e);
+      // Same CoinGecko 429 for every proxy; do not fan out.
+      if (/rate limit|exceeded the rate limit|429/i.test(msg)) break;
+    }
   }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /** Dedupe rapid repeats (free tier friendly). */
