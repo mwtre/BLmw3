@@ -136,6 +136,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     syncStatus,
     syncError,
     syncNow,
+    lastSyncAt,
   } = useTradesStorage();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -485,22 +486,34 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="mr-1 flex items-center gap-2">
-                  <span
-                    className={`rounded-full border-2 px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                      syncStatus === 'synced'
-                        ? 'border-green-700 bg-green-50 text-green-800'
-                        : syncStatus === 'syncing'
-                          ? 'border-black bg-white text-black'
-                          : syncStatus === 'offline'
-                            ? 'border-yellow-700 bg-yellow-50 text-yellow-800'
-                            : syncStatus === 'error'
-                              ? 'border-red-700 bg-red-50 text-red-800'
-                              : 'border-gray-300 bg-gray-50 text-gray-600'
-                    }`}
-                    title={syncError ?? undefined}
-                  >
-                    {syncStatus === 'disabled' ? 'Cloud off' : syncStatus}
-                  </span>
+                  <div className="flex flex-col items-start gap-1">
+                    <span
+                      className={`rounded-full border-2 px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${
+                        syncStatus === 'synced'
+                          ? 'border-green-700 bg-green-50 text-green-800'
+                          : syncStatus === 'syncing'
+                            ? 'border-black bg-white text-black'
+                            : syncStatus === 'offline'
+                              ? 'border-yellow-700 bg-yellow-50 text-yellow-800'
+                              : syncStatus === 'error'
+                                ? 'border-red-700 bg-red-50 text-red-800'
+                                : 'border-gray-300 bg-gray-50 text-gray-600'
+                      }`}
+                      title={syncError ?? undefined}
+                    >
+                      {syncStatus === 'disabled' ? 'Cloud off' : syncStatus}
+                    </span>
+                    {syncStatus === 'error' && syncError && (
+                      <span className="max-w-[240px] text-[10px] font-semibold leading-tight text-red-700">
+                        {syncError}
+                      </span>
+                    )}
+                    {lastSyncAt && syncStatus !== 'disabled' && (
+                      <span className="text-[10px] font-semibold leading-tight text-gray-500">
+                        {new Date(lastSyncAt).toLocaleTimeString()}
+                      </span>
+                    )}
+                  </div>
                   {syncStatus !== 'disabled' && (
                     <button
                       type="button"

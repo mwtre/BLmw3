@@ -27,6 +27,7 @@ export function useTradesStorage() {
     supabaseEnabled ? 'syncing' : 'disabled'
   );
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const syncInFlight = useRef(false);
 
   useEffect(() => {
@@ -112,15 +113,22 @@ export function useTradesStorage() {
     ]);
     setSyncStatus(res.status);
     setSyncError(res.status === 'error' ? res.error ?? 'Sync failed' : null);
+    setLastSyncAt(nowIso());
     syncInFlight.current = false;
   }, [allTrades]);
 
   useEffect(() => {
     if (!supabaseEnabled) return;
     void syncNow();
-    const t = window.setInterval(() => void syncNow(), 15_000);
+    // Periodic sync, but don't hammer when in persistent error state.
+    const t = window.setInterval(() => {
+      if (syncInFlight.current) return;
+      // If the last attempt errored, require a manual click to retry.
+      if (syncError) return;
+      void syncNow();
+    }, 30_000);
     return () => window.clearInterval(t);
-  }, [syncNow]);
+  }, [syncNow, syncError]);
 
   return {
     trades,
@@ -136,5 +144,6 @@ export function useTradesStorage() {
     syncStatus,
     syncError,
     syncNow,
+    lastSyncAt,
   };
 }
