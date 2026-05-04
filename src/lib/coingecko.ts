@@ -42,6 +42,11 @@ const LEGACY_COINGECKO_TO_PAPRICA: Record<string, string> = {
   cosmos: 'atom-cosmos',
   pepe: 'pepe-pepe',
   wormhole: 'w-wormhole',
+  elastos: 'ela-elastos',
+  'kyber-network-crystal': 'knc-kyber-network',
+  kybernetworkcrystal: 'knc-kyber-network',
+  apecoin: 'ape-apecoin',
+  hivemapper: 'honey-hivemapper',
 };
 
 let globalRateLimitUntil = 0;
@@ -117,6 +122,134 @@ const priceInflight = new Map<string, Promise<Record<string, { usd?: number }>>>
 
 function priceCacheKey(ids: string[]) {
   return [...new Set(ids)].sort().join(',');
+}
+
+/** Key used in `openPrices` / batch price maps: Paprika id, or per-trade when id is missing. */
+export function priceLookupKey(t: { id: string; coinGeckoId?: string | null }): string {
+  const id = typeof t.coinGeckoId === 'string' ? t.coinGeckoId.trim() : '';
+  return id.length > 0 ? id : `__trade:${t.id}`;
+}
+
+function normalizeSymbolForSearch(symbol: string): string {
+  const t = symbol.trim();
+  if (!t) return '';
+  const seg = (t.split(/[/\s]+/)[0] ?? t).replace(/[_-]+/g, '');
+  return seg.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32);
+}
+
+function pickSearchHit(
+  hits: { id: string; symbol: string; name: string }[],
+  query: string
+): string | null {
+  if (hits.length === 0) return null;
+  const qu = query.toUpperCase();
+  const exact = hits.find((h) => h.symbol.toUpperCase() === qu);
+  if (exact) return exact.id;
+  const starts = hits.find(
+    (h) => h.symbol.toUpperCase().startsWith(qu) && qu.length >= 2
+  );
+  if (starts) return starts.id;
+  return hits[0]!.id;
+}
+
+export type OpenTradePriceRow = { tradeId: string; coinGeckoId: string; symbol: string };
+
+const openTradePriceInflight = new Map<string, Promise<Record<string, number | null>>>();
+const openTradePriceCache = new Map<string, { at: number; data: Record<string, number | null> }>();
+
+function openTradePriceCacheKey(rows: OpenTradePriceRow[]): string {
+  return rows
+    .map((r) => `${r.tradeId}\t${r.coinGeckoId}\t${r.symbol}`)
+    .sort()
+    .join('\n');
+}
+
+/**
+ * Spot USD for open-trade rows: ticker by stored id, then CoinPaprika search-by-symbol when missing.
+ * Keys match {@link priceLookupKey} so UI can resolve live price even with blank/wrong legacy ids.
+ */
+export async function fetchOpenTradeUsdPrices(
+  rows: OpenTradePriceRow[],
+  signal?: AbortSignal
+): Promise<Record<string, number | null>> {
+  if (rows.length === 0) return {};
+  const cacheKey = openTradePriceCacheKey(rows);
+  const now = Date.now();
+  const hit = openTradePriceCache.get(cacheKey);
+  if (hit && now - hit.at < PRICE_CACHE_TTL_MS) {
+    return hit.data;
+  }
+
+  const existing = openTradePriceInflight.get(cacheKey);
+  if (existing) return existing;
+
+  const p = (async () => {
+    const ids = [...new Set(rows.map((r) => r.coinGeckoId.trim()).filter((x) => x.length > 0))];
+    const base = await fetchSimpleUsdPrices(ids, signal);
+    const out: Record<string, number | null> = {};
+
+    const rowKey = (row: OpenTradePriceRow) =>
+      priceLookupKey({ id: row.tradeId, coinGeckoId: row.coinGeckoId });
+
+    for (const row of rows) {
+      const lk = rowKey(row);
+      const rawId = row.coinGeckoId.trim();
+      if (rawId) {
+        const usd = base[rawId]?.usd;
+        if (typeof usd === 'number' && Number.isFinite(usd)) {
+          out[lk] = usd;
+        }
+      }
+    }
+
+    const missing: OpenTradePriceRow[] = [];
+    const seenLk = new Set<string>();
+    for (const row of rows) {
+      const lk = rowKey(row);
+      if (typeof out[lk] === 'number' && Number.isFinite(out[lk]!)) continue;
+      if (seenLk.has(lk)) continue;
+      seenLk.add(lk);
+      missing.push(row);
+    }
+
+    const chunk = 4;
+    for (let i = 0; i < missing.length; i += chunk) {
+      const slice = missing.slice(i, i + chunk);
+      await Promise.all(
+        slice.map(async (row) => {
+          if (signal?.aborted) return;
+          const lk = rowKey(row);
+          const q = normalizeSymbolForSearch(row.symbol);
+          if (q.length < 1) return;
+          try {
+            const hits = await searchCoins(q, signal);
+            const paprikaId = pickSearchHit(hits, q);
+            if (!paprikaId || signal?.aborted) return;
+            const ticker = await fetchPaprikaJson<PaprikaTicker>(
+              `/tickers/${encodeURIComponent(paprikaId)}`,
+              signal
+            );
+            const price = ticker?.quotes?.USD?.price;
+            if (typeof price === 'number' && Number.isFinite(price)) {
+              out[lk] = price;
+            }
+          } catch {
+            // leave absent
+          }
+        })
+      );
+    }
+
+    openTradePriceCache.set(cacheKey, { at: Date.now(), data: out });
+    return out;
+  })();
+
+  openTradePriceInflight.set(cacheKey, p);
+  try {
+    return await p;
+  } finally {
+    openTradePriceInflight.delete(cacheKey);
+  }
 }
 
 /** Coin ids: Paprika ids (e.g. btc-bitcoin) or legacy CoinGecko ids (e.g. bitcoin). */

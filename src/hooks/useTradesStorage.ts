@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import type { ProfitTrade, TradeStatus } from '../types/trade';
 import {
@@ -27,7 +27,8 @@ export function useTradesStorage() {
   useEffect(() => {
     allTradesRef.current = allTrades;
   }, [allTrades]);
-  const trades = allTrades.filter((t) => !t.deletedAt);
+  /** Must be referentially stable when `allTrades` is unchanged, or every UI re-run (e.g. open "Add trade") recomputes huge month metrics. */
+  const trades = useMemo(() => allTrades.filter((t) => !t.deletedAt), [allTrades]);
   const [storageError, setStorageError] = useState<string | null>(null);
   const [authSession, setAuthSession] = useState<Session | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {

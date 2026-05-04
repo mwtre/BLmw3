@@ -17,10 +17,12 @@ import {
   X,
 } from 'lucide-react';
 import {
+  fetchOpenTradeUsdPrices,
   fetchSimpleUsdPrices,
   formatCoingeckoError,
   normalizeToPaprikaCoinId,
   POPULAR_COIN_IDS,
+  priceLookupKey,
   searchCoins,
 } from '../lib/coingecko';
 import {
@@ -264,35 +266,36 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
 
   useEffect(() => {
     if (readOnly) return;
-    const ids = [
-      ...new Set(
-        openTrades
-          .map((t) => t.coinGeckoId)
-          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-      ),
-    ];
-    if (ids.length === 0) {
+    if (openTrades.length === 0) {
       setOpenPrices({});
       return;
     }
+    const rows = openTrades.map((t) => ({
+      tradeId: t.id,
+      coinGeckoId: typeof t.coinGeckoId === 'string' ? t.coinGeckoId : '',
+      symbol: typeof t.symbol === 'string' ? t.symbol : '',
+    }));
     const ac = new AbortController();
     const run = async () => {
       if (document.visibilityState === 'hidden') return;
       try {
-        const data = await fetchSimpleUsdPrices(ids, ac.signal);
+        const data = await fetchOpenTradeUsdPrices(rows, ac.signal);
         if (ac.signal.aborted) return;
-        const next: Record<string, number | null> = {};
-        for (const id of ids) next[id] = data[id]?.usd ?? null;
-        setOpenPrices(next);
+        setOpenPrices(data);
       } catch {
         // ignore; keep last good
       }
     };
     void run();
-    const t = window.setInterval(run, 180_000);
+    const tick = window.setInterval(run, 180_000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void run();
+    };
+    document.addEventListener('visibilitychange', onVis);
     return () => {
       ac.abort();
-      window.clearInterval(t);
+      window.clearInterval(tick);
+      document.removeEventListener('visibilitychange', onVis);
     };
   }, [openTrades, readOnly]);
 
@@ -1176,7 +1179,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 </thead>
                 <tbody>
                   {openTrades.map((t) => {
-                    const live = openPrices[t.coinGeckoId ?? ''] ?? null;
+                    const live = openPrices[priceLookupKey(t)] ?? null;
                     const target = parsePlanTarget(t.notes);
                     const ep = Number(t.entryPrice);
                     const entryOk = Number.isFinite(ep) && ep !== 0;
