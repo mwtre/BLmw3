@@ -16,6 +16,7 @@ export default function ProfitAuthBar({
   onAuthChange: () => void;
 }) {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -66,6 +67,26 @@ export default function ProfitAuthBar({
     }
   };
 
+  const signInWithPassword = async () => {
+    const e = email.trim();
+    if (!e || !password) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await supabase.auth.signInWithPassword({
+        email: e,
+        password,
+      });
+      if (res.error) throw res.error;
+      setMsg(null);
+      onAuthChange();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : 'Password sign-in failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const signOut = async () => {
     setBusy(true);
     setMsg(null);
@@ -110,11 +131,30 @@ export default function ProfitAuthBar({
               placeholder="you@domain.com"
               className="min-w-[200px] flex-1 rounded border-2 border-black px-3 py-2 text-sm"
             />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={password}
+              onChange={(ev) => setPassword(ev.target.value)}
+              type="password"
+              placeholder="Password"
+              className="min-w-[200px] flex-1 rounded border-2 border-black px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void signInWithPassword()}
+              disabled={busy || !email.trim() || !password}
+              className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-black px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-900 disabled:opacity-50"
+            >
+              <LogIn className="h-4 w-4" />
+              Sign in
+            </button>
             <button
               type="button"
               onClick={() => void sendEmailCode()}
               disabled={busy || !email.trim()}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-black px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-900 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
+              title="Email link (fallback)"
             >
               <Mail className="h-4 w-4" />
               Email link
