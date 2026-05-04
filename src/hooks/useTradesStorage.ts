@@ -8,6 +8,7 @@ import {
   saveTrades,
 } from '../lib/tradesPersist';
 import { syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
+import { isAdminSession } from '../lib/adminAccess';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
 function uid() {
@@ -38,10 +39,13 @@ export function useTradesStorage() {
   const syncInFlight = useRef(false);
   const syncWatchdog = useRef<number | null>(null);
 
+  const persistLocal = isAdminSession(authSession?.user);
+
   useEffect(() => {
+    if (!persistLocal) return;
     const { ok, error } = saveTrades(allTrades);
     setStorageError(ok ? null : error ?? 'Save failed');
-  }, [allTrades]);
+  }, [allTrades, persistLocal]);
 
   const clearStorageError = useCallback(() => setStorageError(null), []);
 
@@ -130,7 +134,8 @@ export function useTradesStorage() {
 
   const syncNow = useCallback(async () => {
     if (!supabaseEnabled) return;
-    if (!authSession) {
+    const admin = isAdminSession(authSession?.user);
+    if (admin && !authSession) {
       setSyncStatus('signed_out');
       setSyncError('Sign in to sync');
       setLastSyncAt(nowIso());
@@ -187,7 +192,8 @@ export function useTradesStorage() {
 
   useEffect(() => {
     if (!supabaseEnabled) return;
-    if (!authSession) {
+    const admin = isAdminSession(authSession?.user);
+    if (admin && !authSession) {
       setSyncStatus('signed_out');
       return;
     }
@@ -219,5 +225,7 @@ export function useTradesStorage() {
     lastSyncAt,
     authSession,
     refreshSession,
+    persistLocal,
+    isAdmin: persistLocal,
   };
 }

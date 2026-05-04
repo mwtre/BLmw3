@@ -1,4 +1,5 @@
 import type { ProfitTrade } from '../types/trade';
+import { isAdminSession } from './adminAccess';
 import { supabase, supabaseEnabled } from './supabaseClient';
 
 export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error' | 'signed_out';
@@ -41,7 +42,7 @@ export async function syncTradesOnce(
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
-    if (!user) return { status: 'signed_out', error: 'Sign in to sync' };
+    const admin = isAdminSession(user);
 
     const current = getCurrent();
     const lastPull = (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PULL)) || null;
@@ -50,14 +51,22 @@ export async function syncTradesOnce(
     // 1) Pull remote changes
     let remoteRows: { id: string; payload: unknown; updated_at: string; deleted_at: string | null }[] = [];
     {
-      const q = supabase
+      let q = supabase
         .from('trades')
         .select('id,payload,updated_at,deleted_at')
-        .eq('user_id', user.id)
         .order('updated_at', { ascending: true });
-      const res = lastPull ? await q.gte('updated_at', lastPull) : await q;
-      if (res.error) throw new Error(res.error.message);
-      remoteRows = res.data ?? [];
+      if (admin) {
+        if (!user) return { status: 'signed_out', error: 'Sign in to sync' };
+        q = q.eq('user_id', user.id);
+        const res = lastPull ? await q.gte('updated_at', lastPull) : await q;
+        if (res.error) throw new Error(res.error.message);
+        remoteRows = res.data ?? [];
+      } else {
+        // Public read: RLS allows select for everyone; viewers should see the full published ledger.
+        const res = await q;
+        if (res.error) throw new Error(res.error.message);
+        remoteRows = res.data ?? [];
+      }
     }
 
     const remoteTrades: ProfitTrade[] = remoteRows.map((r) => {
@@ -83,23 +92,28 @@ export async function syncTradesOnce(
 
     // Bootstrap: remote has zero rows but local has trades. Older builds could set last_push watermarks
     // during pull-only syncs, preventing upload — reset markers so we do a full upsert once.
-    const localHasRows = current.some((t) => !t.deletedAt);
-    if (remoteRows.length === 0 && localHasRows && typeof localStorage !== 'undefined') {
-      localStorage.removeItem(LS_LAST_PUSH);
-      localStorage.removeItem(LS_LAST_PULL);
+    if (admin) {
+      const localHasRows = current.some((t) => !t.deletedAt);
+      if (remoteRows.length === 0 && localHasRows && typeof localStorage !== 'undefined') {
+        localStorage.removeItem(LS_LAST_PUSH);
+        localStorage.removeItem(LS_LAST_PULL);
+      }
     }
 
-    const merged = mergeTrades(current, remoteTrades);
+    const merged = admin ? mergeTrades(current, remoteTrades) : remoteTrades;
     setNext(merged);
 
     // bump last pull watermark
-    if (typeof localStorage !== 'undefined' && remoteRows.length > 0) {
+    if (admin && typeof localStorage !== 'undefined' && remoteRows.length > 0) {
       localStorage.setItem(LS_LAST_PULL, remoteRows[remoteRows.length - 1]!.updated_at);
-    } else if (typeof localStorage !== 'undefined' && !lastPull) {
+    } else if (admin && typeof localStorage !== 'undefined' && !lastPull) {
       localStorage.setItem(LS_LAST_PULL, nowIso());
     }
 
     // 2) Push local changes (since last push)
+    if (!admin) return { status: 'synced' };
+    if (!user) return { status: 'signed_out', error: 'Sign in to sync' };
+
     const effectiveLastPush =
       (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PUSH)) || lastPush;
     const lastPushMs = toMillis(effectiveLastPush);

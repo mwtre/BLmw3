@@ -5,6 +5,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_ANON_KEY?: string;
   readonly VITE_SUPABASE_SYNC_ENABLED?: string;
   readonly VITE_APP_BUILD?: string;
+  /** Email allowed to edit/import/sync trades (single-owner mode). */
+  readonly VITE_ADMIN_EMAIL?: string;
 }
 
 interface ImportMeta {

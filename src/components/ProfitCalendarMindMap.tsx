@@ -142,6 +142,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     lastSyncAt,
     authSession,
     refreshSession,
+    isAdmin,
   } = useTradesStorage();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -171,6 +172,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   /** Ticker shown in ledger — synced from popular list or search pick */
   const [symbolLabel, setSymbolLabel] = useState('BTC');
   const [priceNonce, setPriceNonce] = useState(0);
+
+  const readOnly = supabaseEnabled && !isAdmin;
 
   useEffect(() => {
     const p = POPULAR_COIN_IDS.find((c) => c.id === priceCoinId);
@@ -322,6 +325,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
 
   const onSubmitTrade = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     const ep = parseFloat(entryPrice);
     const q = parseFloat(qty);
     if (!Number.isFinite(ep) || !Number.isFinite(q) || q <= 0) return;
@@ -369,6 +373,10 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const createShareLink = async () => {
     if (!supabaseEnabled || !supabase) {
       setImportMessage('Supabase is not enabled (missing env keys).');
+      return;
+    }
+    if (!isAdmin) {
+      setImportMessage('Only the owner account can create share links.');
       return;
     }
     if (shareBusy) return;
@@ -439,6 +447,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const onPickImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setImportMessage(null);
+    if (!isAdmin) {
+      setImportMessage('Only the owner account can import trades.');
+      e.target.value = '';
+      return;
+    }
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -472,6 +485,13 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
             >
               <X className="h-4 w-4" />
             </button>
+          </div>
+        )}
+
+        {readOnly && (
+          <div className="mb-6 rounded-xl border-2 border-black bg-gray-50 p-4 text-sm text-gray-800">
+            <strong>Public view:</strong> you can browse the published Profit ledger. Only the owner account can add,
+            edit, import, or sync changes.
           </div>
         )}
 
@@ -529,18 +549,26 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                       type="button"
                       onClick={() => void syncNow()}
                       className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
-                      disabled={syncStatus === 'syncing' || syncStatus === 'signed_out'}
-                      title={syncError ?? 'Sync now'}
+                      disabled={
+                        syncStatus === 'syncing' ||
+                        (isAdmin && syncStatus === 'signed_out')
+                      }
+                      title={
+                        readOnly
+                          ? 'Refresh published trades'
+                          : syncError ?? 'Sync now'
+                      }
                     >
                       <RefreshCw className={`h-4 w-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                      Sync
+                      {readOnly ? 'Refresh' : 'Sync'}
                     </button>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={downloadBackup}
-                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white"
+                  disabled={readOnly}
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
                 >
                   <Download className="h-4 w-4" />
                   Export JSON
@@ -548,11 +576,13 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 <button
                   type="button"
                   onClick={() => void createShareLink()}
-                  disabled={shareBusy || syncStatus === 'disabled' || !authSession}
+                  disabled={shareBusy || syncStatus === 'disabled' || !authSession || readOnly}
                   className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
                   title={
                     syncStatus === 'disabled'
                       ? 'Enable Supabase env keys to create share links'
+                      : readOnly
+                        ? 'Owner only'
                       : !authSession
                         ? 'Sign in to create share links'
                       : 'Create a read-only share snapshot for the current range'
@@ -564,7 +594,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 <button
                   type="button"
                   onClick={() => importInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white"
+                  disabled={readOnly}
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
                 >
                   <Upload className="h-4 w-4" />
                   Import
@@ -572,7 +603,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 <button
                   type="button"
                   onClick={() => setScreenshotImportOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white"
+                  disabled={readOnly}
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
                 >
                   <ImageIcon className="h-4 w-4" />
                   Screenshot
@@ -580,7 +612,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 <button
                   type="button"
                   onClick={() => setPastScreenshotImportOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white"
+                  disabled={readOnly}
+                  className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
                 >
                   Past trade
                 </button>
@@ -694,7 +727,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
             <button
               type="button"
               onClick={() => setFormOpen((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-black px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-gray-900"
+              disabled={readOnly}
+              className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-black px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-white hover:bg-gray-900 disabled:opacity-50"
             >
               <Plus className="h-4 w-4" />
               Add trade
@@ -1139,41 +1173,47 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLinkTargetId(t.id);
-                              setLinkValue(t.sourceUrl ?? '');
-                            }}
-                            className="mr-2 inline-flex items-center rounded border border-black p-1 hover:bg-black hover:text-white"
-                            aria-label="Add/edit source link"
-                          >
-                            <Link2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCloseTarget(t);
-                              setCloseExit('');
-                              fetchSimpleUsdPrices([t.coinGeckoId])
-                                .then((data) => {
-                                  const p = data[t.coinGeckoId]?.usd;
-                                  if (p != null) setCloseExit(String(p));
-                                })
-                                .catch(() => {});
-                            }}
-                            className="mr-2 rounded border border-black px-2 py-1 text-xs font-bold uppercase hover:bg-black hover:text-white"
-                          >
-                            Close
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Delete trade"
-                            onClick={() => removeTrade(t.id)}
-                            className="inline-flex rounded border border-red-600 p-1 text-red-600 hover:bg-red-600 hover:text-white"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {isAdmin ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLinkTargetId(t.id);
+                                  setLinkValue(t.sourceUrl ?? '');
+                                }}
+                                className="mr-2 inline-flex items-center rounded border border-black p-1 hover:bg-black hover:text-white"
+                                aria-label="Add/edit source link"
+                              >
+                                <Link2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCloseTarget(t);
+                                  setCloseExit('');
+                                  fetchSimpleUsdPrices([t.coinGeckoId])
+                                    .then((data) => {
+                                      const p = data[t.coinGeckoId]?.usd;
+                                      if (p != null) setCloseExit(String(p));
+                                    })
+                                    .catch(() => {});
+                                }}
+                                className="mr-2 rounded border border-black px-2 py-1 text-xs font-bold uppercase hover:bg-black hover:text-white"
+                              >
+                                Close
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Delete trade"
+                                onClick={() => removeTrade(t.id)}
+                                className="inline-flex rounded border border-red-600 p-1 text-red-600 hover:bg-red-600 hover:text-white"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs font-semibold text-gray-400">View</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1264,25 +1304,31 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLinkTargetId(t.id);
-                              setLinkValue(t.sourceUrl ?? '');
-                            }}
-                            className="mr-2 inline-flex items-center rounded border border-black p-1 hover:bg-black hover:text-white"
-                            aria-label="Add/edit source link"
-                          >
-                            <Link2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Delete trade"
-                            onClick={() => removeTrade(t.id)}
-                            className="inline-flex rounded border border-red-600 p-1 text-red-600 hover:bg-red-600 hover:text-white"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {isAdmin ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setLinkTargetId(t.id);
+                                  setLinkValue(t.sourceUrl ?? '');
+                                }}
+                                className="mr-2 inline-flex items-center rounded border border-black p-1 hover:bg-black hover:text-white"
+                                aria-label="Add/edit source link"
+                              >
+                                <Link2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Delete trade"
+                                onClick={() => removeTrade(t.id)}
+                                className="inline-flex rounded border border-red-600 p-1 text-red-600 hover:bg-red-600 hover:text-white"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs font-semibold text-gray-400">View</span>
+                          )}
                         </td>
                       </tr>
                     );
