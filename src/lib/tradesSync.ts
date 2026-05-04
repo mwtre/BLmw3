@@ -89,6 +89,14 @@ export async function syncTradesOnce(
       };
     });
 
+    // Bootstrap: remote has zero rows but local has trades. Older builds could set last_push watermarks
+    // during pull-only syncs, preventing upload — reset markers so we do a full upsert once.
+    const localHasRows = current.some((t) => !t.deletedAt);
+    if (remoteRows.length === 0 && localHasRows && typeof localStorage !== 'undefined') {
+      localStorage.removeItem(LS_LAST_PUSH);
+      localStorage.removeItem(LS_LAST_PULL);
+    }
+
     const merged = mergeTrades(current, remoteTrades);
     setNext(merged);
 
@@ -100,7 +108,9 @@ export async function syncTradesOnce(
     }
 
     // 2) Push local changes (since last push)
-    const lastPushMs = toMillis(lastPush);
+    const effectiveLastPush =
+      (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PUSH)) || lastPush;
+    const lastPushMs = toMillis(effectiveLastPush);
     const changed = merged.filter((t) => toMillis(t.updatedAt) > lastPushMs);
     if (changed.length > 0) {
       const upserts = changed.map((t) => ({
@@ -113,8 +123,6 @@ export async function syncTradesOnce(
       const res = await supabase.from('trades').upsert(upserts, { onConflict: 'id' });
       if (res.error) throw new Error(res.error.message);
       if (typeof localStorage !== 'undefined') localStorage.setItem(LS_LAST_PUSH, nowIso());
-    } else if (typeof localStorage !== 'undefined' && !lastPush) {
-      localStorage.setItem(LS_LAST_PUSH, nowIso());
     }
 
     return { status: 'synced' };
