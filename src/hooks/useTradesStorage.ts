@@ -105,16 +105,27 @@ export function useTradesStorage() {
     if (syncInFlight.current) return;
     syncInFlight.current = true;
     setSyncStatus('syncing');
-    const res = await Promise.race<{ status: SyncStatus; error?: string }>([
-      syncTradesOnce(allTrades, setAllTrades),
-      new Promise((resolve) =>
-        window.setTimeout(() => resolve({ status: 'error', error: 'Sync timed out' }), 12_000)
-      ),
-    ]);
-    setSyncStatus(res.status);
-    setSyncError(res.status === 'error' ? res.error ?? 'Sync failed' : null);
-    setLastSyncAt(nowIso());
-    syncInFlight.current = false;
+    try {
+      const timeoutMs = 12_000;
+      const res = await Promise.race<{ status: SyncStatus; error?: string }>([
+        syncTradesOnce(allTrades, setAllTrades),
+        new Promise((resolve) =>
+          globalThis.setTimeout(
+            () => resolve({ status: 'error', error: `Sync timed out after ${timeoutMs / 1000}s` }),
+            timeoutMs
+          )
+        ),
+      ]);
+      setSyncStatus(res.status);
+      setSyncError(res.status === 'error' ? res.error ?? 'Sync failed' : null);
+      setLastSyncAt(nowIso());
+    } catch (e) {
+      setSyncStatus('error');
+      setSyncError(e instanceof Error ? e.message : 'Sync failed');
+      setLastSyncAt(nowIso());
+    } finally {
+      syncInFlight.current = false;
+    }
   }, [allTrades]);
 
   useEffect(() => {
