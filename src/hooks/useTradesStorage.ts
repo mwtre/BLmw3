@@ -29,6 +29,7 @@ export function useTradesStorage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const syncInFlight = useRef(false);
+  const syncWatchdog = useRef<number | null>(null);
 
   useEffect(() => {
     const { ok, error } = saveTrades(allTrades);
@@ -127,6 +128,25 @@ export function useTradesStorage() {
       syncInFlight.current = false;
     }
   }, [allTrades]);
+
+  useEffect(() => {
+    if (syncWatchdog.current) {
+      window.clearTimeout(syncWatchdog.current);
+      syncWatchdog.current = null;
+    }
+    if (syncStatus !== 'syncing') return;
+    syncWatchdog.current = window.setTimeout(() => {
+      // If we're still syncing after this window, force an error that will be visible in UI.
+      setSyncStatus('error');
+      setSyncError('Sync stuck (no response) — check adblock/extensions or Supabase network access');
+      setLastSyncAt(nowIso());
+      syncInFlight.current = false;
+    }, 15_000);
+    return () => {
+      if (syncWatchdog.current) window.clearTimeout(syncWatchdog.current);
+      syncWatchdog.current = null;
+    };
+  }, [syncStatus]);
 
   useEffect(() => {
     if (!supabaseEnabled) return;

@@ -37,6 +37,8 @@ import type { ProfitTrade } from '../types/trade';
 
 type CalMode = 'day' | 'week' | 'month';
 
+const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
+
 function parsePlanTarget(notes: string): number | null {
   const m = notes.match(/plan\s+target:\s*([0-9][0-9,]*\.?[0-9]*)/i);
   if (!m?.[1]) return null;
@@ -483,6 +485,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                   Log trades with CoinGecko spot prices (free tier). Open positions stay editable; closing
                   stores realized P/L locally for totals — data stays in your browser.
                 </p>
+                {BUILD && (
+                  <p className="mt-1 text-[10px] font-semibold tracking-wide text-gray-400">
+                    build {BUILD.slice(0, 7)}
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="mr-1 flex items-center gap-2">
