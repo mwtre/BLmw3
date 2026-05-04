@@ -16,7 +16,12 @@ import {
   Link2,
   X,
 } from 'lucide-react';
-import { fetchSimpleUsdPrices, POPULAR_COIN_IDS, searchCoins } from '../lib/coingecko';
+import {
+  fetchSimpleUsdPrices,
+  formatCoingeckoError,
+  POPULAR_COIN_IDS,
+  searchCoins,
+} from '../lib/coingecko';
 import {
   addDays,
   addMonths,
@@ -156,6 +161,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [priceLoading, setPriceLoading] = useState(false);
   const [searchQ, setSearchQ] = useState('');
   const [searchHits, setSearchHits] = useState<{ id: string; symbol: string; name: string }[]>([]);
+  const [searchCoinError, setSearchCoinError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [closeTarget, setCloseTarget] = useState<ProfitTrade | null>(null);
   const [closeExit, setCloseExit] = useState('');
@@ -195,7 +201,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
         if (p != null) setEntryPrice(String(p));
       } catch (e: unknown) {
         if (e instanceof DOMException && e.name === 'AbortError') return;
-        setPriceError(e instanceof Error ? e.message : 'Price fetch failed');
+        setPriceError(formatCoingeckoError(e));
         setLivePrice(null);
       } finally {
         if (!ac.signal.aborted) setPriceLoading(false);
@@ -261,7 +267,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       }
     };
     void run();
-    const t = window.setInterval(run, 90_000);
+    const t = window.setInterval(run, 180_000);
     return () => {
       ac.abort();
       window.clearInterval(t);
@@ -784,34 +790,40 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
             </span>
             {priceError && <span className="text-xs text-red-600">{priceError}</span>}
           </div>
-          <div className="relative flex flex-wrap items-center gap-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <input
-              value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder="Search coin (e.g. aptos)…"
-              className="min-w-[200px] flex-1 rounded border-2 border-black px-3 py-2 text-sm"
-            />
-            {searchHits.length > 0 && (
-              <ul className="absolute left-0 top-full z-30 mt-1 max-h-48 w-full overflow-auto rounded border-2 border-black bg-white shadow-lg md:w-96">
-                {searchHits.map((h) => (
-                  <li key={h.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black hover:text-white"
-                      onClick={() => {
-                        setPriceCoinId(h.id);
-                        setSymbolLabel(h.symbol.toUpperCase());
-                        setSearchQ('');
-                        setSearchHits([]);
-                      }}
-                    >
-                      <span className="font-semibold uppercase">{h.symbol}</span>
-                      <span className="text-gray-600">{h.name}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+          <div className="flex flex-col gap-1">
+            <div className="relative flex flex-wrap items-center gap-2">
+              <Search className="h-4 w-4 text-gray-400" />
+              <input
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="Search coin (e.g. aptos)…"
+                className="min-w-[200px] flex-1 rounded border-2 border-black px-3 py-2 text-sm"
+              />
+              {searchHits.length > 0 && (
+                <ul className="absolute left-0 top-full z-30 mt-1 max-h-48 w-full overflow-auto rounded border-2 border-black bg-white shadow-lg md:w-96">
+                  {searchHits.map((h) => (
+                    <li key={h.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-black hover:text-white"
+                        onClick={() => {
+                          setPriceCoinId(h.id);
+                          setSymbolLabel(h.symbol.toUpperCase());
+                          setSearchQ('');
+                          setSearchHits([]);
+                          setSearchCoinError(null);
+                        }}
+                      >
+                        <span className="font-semibold uppercase">{h.symbol}</span>
+                        <span className="text-gray-600">{h.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {searchCoinError && (
+              <p className="text-xs font-semibold leading-snug text-red-700">{searchCoinError}</p>
             )}
           </div>
         </section>
