@@ -9,7 +9,7 @@
  *
  * Deploy: `supabase functions deploy revolut-prices --project-ref <ref>`
  *
- * Note: Revolut X (revx.revolut.com + Ed25519 signing) is different — not implemented here.
+ * For Revolut X (exchange tickers + Ed25519), use `supabase/functions/revolut-x-prices` instead.
  */
 
 const cors = {

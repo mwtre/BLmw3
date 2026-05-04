@@ -10,6 +10,9 @@ const CUSTOM_PROXY_BASE =
 /** USD spot prices via Supabase Edge Function calling Revolut Business API (token stays server-side). */
 const USE_REVOLUT_EDGE =
   (import.meta.env.VITE_USE_REVOLUT_EDGE_PRICES as string | undefined)?.toLowerCase() === 'true';
+/** Revolut X (crypto exchange) tickers via Edge Function — takes precedence over Business + CoinGecko when true. */
+const USE_REVOLUT_X_EDGE =
+  (import.meta.env.VITE_USE_REVOLUT_X_EDGE_PRICES as string | undefined)?.toLowerCase() === 'true';
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
 const SUPABASE_ANON = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)?.trim();
 
@@ -68,17 +71,21 @@ export function isCoingeckoRateLimitError(err: unknown): boolean {
 /** Short message for UI when CoinGecko or proxies refuse requests. */
 export function formatCoingeckoError(err: unknown): string {
   if (!(err instanceof Error)) return 'Market data request failed';
+  if (/VITE_USE_REVOLUT_X_EDGE_PRICES requires/i.test(err.message)) return err.message;
   if (/VITE_USE_REVOLUT_EDGE_PRICES requires/i.test(err.message)) return err.message;
+  if (/Revolut X prices/i.test(err.message)) {
+    return 'Revolut X prices failed — deploy revolut-x-prices and set REVOLUT_X_API_KEY + REVOLUT_X_PRIVATE_KEY in Supabase (see supabase/functions/revolut-x-prices).';
+  }
   if (/Revolut prices/i.test(err.message)) {
     return 'Revolut prices failed — deploy the revolut-prices Edge Function and set REVOLUT_ACCESS_TOKEN in Supabase (see supabase/functions/revolut-prices).';
   }
   if (isRateLimitMessage(err.message)) {
-    if (USE_REVOLUT_EDGE) {
+    if (USE_REVOLUT_X_EDGE || USE_REVOLUT_EDGE) {
       return 'Rate limit or upstream error. If you use Revolut, check the Edge Function; otherwise add VITE_COINGECKO_API_KEY for CoinGecko.';
     }
     return DEMO_API_KEY
       ? 'CoinGecko rate limit — wait a few minutes or check your API plan.'
-      : 'CoinGecko free tier is rate-limited. Wait ~2 min, refresh less often, or add VITE_COINGECKO_API_KEY (free demo key at coingecko.com/api), or enable VITE_USE_REVOLUT_EDGE_PRICES with the Supabase function.';
+      : 'CoinGecko free tier is rate-limited. Wait ~2 min, refresh less often, add VITE_COINGECKO_API_KEY, or use VITE_USE_REVOLUT_X_EDGE_PRICES / VITE_USE_REVOLUT_EDGE_PRICES with a Supabase Edge Function.';
   }
   return err.message;
 }
@@ -102,6 +109,29 @@ async function fetchRevolutEdgePrices(
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`Revolut prices (${res.status}): ${t.slice(0, 240)}`);
+  }
+  return res.json() as Promise<Record<string, { usd?: number }>>;
+}
+
+async function fetchRevolutXEdgePrices(
+  coinIds: string[],
+  signal?: AbortSignal
+): Promise<Record<string, { usd?: number }>> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) {
+    throw new Error('VITE_USE_REVOLUT_X_EDGE_PRICES requires VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+  }
+  const params = new URLSearchParams({ ids: [...new Set(coinIds)].join(',') });
+  const fnUrl = `${SUPABASE_URL.replace(/\/+$/, '')}/functions/v1/revolut-x-prices?${params}`;
+  const res = await fetch(fnUrl, {
+    signal,
+    headers: {
+      Authorization: `Bearer ${SUPABASE_ANON}`,
+      apikey: SUPABASE_ANON,
+    },
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Revolut X prices (${res.status}): ${t.slice(0, 240)}`);
   }
   return res.json() as Promise<Record<string, { usd?: number }>>;
 }
@@ -177,6 +207,18 @@ export async function fetchSimpleUsdPrices(
   if (existing) return existing;
 
   const p = (async () => {
+    if (USE_REVOLUT_X_EDGE) {
+      try {
+        const data = await fetchRevolutXEdgePrices(coinIds, signal);
+        priceCache.set(key, { at: Date.now(), data });
+        return data;
+      } catch (e) {
+        const stale = priceCache.get(key);
+        if (stale && isCoingeckoRateLimitError(e)) return stale.data;
+        throw e;
+      }
+    }
+
     if (USE_REVOLUT_EDGE) {
       try {
         const data = await fetchRevolutEdgePrices(coinIds, signal);
