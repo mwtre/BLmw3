@@ -31,6 +31,7 @@ import {
   startOfDay,
   weekMonday,
 } from '../lib/calendarUtils';
+import { buildMonthGridMetrics } from '../lib/profitCalendarMetrics';
 import { aggregateClosed, aggregateClosedRange, realizedPnL, realizedPnLPercent } from '../lib/tradeMath';
 import { useTradesStorage } from '../hooks/useTradesStorage';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
@@ -401,6 +402,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   };
 
   const grid = useMemo(() => monthGrid(cursor), [cursor]);
+  const gridFlat = useMemo(() => grid.flat(), [grid]);
+  const monthMetrics = useMemo(
+    () => (mode === 'month' ? buildMonthGridMetrics(trades, cursor, gridFlat) : null),
+    [trades, cursor, gridFlat, mode]
+  );
 
   const downloadBackup = () => {
     const blob = new Blob([exportJson()], { type: 'application/json' });
@@ -971,18 +977,19 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 if (!cell) {
                   return <div key={`pad-${i}`} className="min-h-[88px] bg-gray-50" />;
                 }
-                const dayTrades = trades.filter((t) => tradeOnDay(t, cell));
-                const nOpen = dayTrades.filter((t) => t.status === 'open').length;
-                // Count "closed" only on the actual close date (not the whole active range).
                 const cKey = localYmd(cell);
-                const nOpened = trades.filter((t) => localYmd(new Date(t.openedAt)) === cKey).length;
-                const nClosed = dayTrades.filter((t) => {
-                  if (t.status !== 'closed') return false;
-                  const closedKey = localYmd(new Date(t.closedAt ?? t.openedAt));
-                  return closedKey === cKey;
-                }).length;
-                const dayStart = startOfDay(cell);
-                const dayAgg = aggregateClosedRange(trades, dayStart, endOfDay(dayStart));
+                const met = monthMetrics?.get(cKey);
+                const nOpen = met?.nOpen ?? 0;
+                const nOpened = met?.nOpened ?? 0;
+                const nClosed = met?.nClosed ?? 0;
+                const dayAgg = met?.dayAgg ?? {
+                  pnlUsd: 0,
+                  equityUsd: 0,
+                  pnlPctEquityWeighted: null,
+                  pnlPctAvg: null,
+                  pnlPctSum: 0,
+                  closed: 0,
+                };
                 const isToday = sameDay(cell, new Date());
                 return (
                   <button
