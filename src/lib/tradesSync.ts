@@ -1,7 +1,7 @@
 import type { ProfitTrade } from '../types/trade';
 import { supabase, supabaseEnabled } from './supabaseClient';
 
-export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error';
+export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error' | 'signed_out';
 
 const LS_LAST_PULL = 'mw3-supabase-trades-last-pull';
 const LS_LAST_PUSH = 'mw3-supabase-trades-last-push';
@@ -31,13 +31,6 @@ function mergeTrades(local: ProfitTrade[], remote: ProfitTrade[]): ProfitTrade[]
   return [...map.values()];
 }
 
-async function ensureAnonSession() {
-  if (!supabaseEnabled || !supabase) return;
-  const { data } = await supabase.auth.getSession();
-  if (data.session) return;
-  await supabase.auth.signInAnonymously();
-}
-
 export async function syncTradesOnce(
   getCurrent: () => ProfitTrade[],
   setNext: (next: ProfitTrade[]) => void
@@ -46,10 +39,9 @@ export async function syncTradesOnce(
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'offline' };
 
   try {
-    await ensureAnonSession();
     const { data: sessionData } = await supabase.auth.getSession();
     const user = sessionData.session?.user;
-    if (!user) return { status: 'error', error: 'No Supabase session' };
+    if (!user) return { status: 'signed_out', error: 'Sign in to sync' };
 
     const current = getCurrent();
     const lastPull = (typeof localStorage !== 'undefined' && localStorage.getItem(LS_LAST_PULL)) || null;

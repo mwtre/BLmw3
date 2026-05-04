@@ -32,6 +32,7 @@ import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 import CloseTradeModal from './profit/CloseTradeModal';
 import ScreenshotImportModal from './profit/ScreenshotImportModal';
 import TradeLinkModal from './profit/TradeLinkModal';
+import ProfitAuthBar from './profit/ProfitAuthBar';
 import MindMapCloseButton from './mind-map/MindMapCloseButton';
 import type { ProfitTrade } from '../types/trade';
 
@@ -139,6 +140,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     syncError,
     syncNow,
     lastSyncAt,
+    authSession,
+    refreshSession,
   } = useTradesStorage();
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
@@ -372,14 +375,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     setShareBusy(true);
     setImportMessage(null);
     try {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session?.user) {
-        const r = await supabase.auth.signInAnonymously();
-        if (r.error) throw new Error(r.error.message);
+      const user = authSession?.user;
+      if (!user) {
+        setImportMessage('Sign in to create a share link.');
+        return;
       }
-      const { data: s2 } = await supabase.auth.getSession();
-      const user = s2.session?.user;
-      if (!user) throw new Error('No Supabase session');
 
       const shareId =
         typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -492,6 +492,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <ProfitAuthBar session={authSession} onAuthChange={() => void refreshSession()} />
                 <div className="mr-1 flex items-center gap-2">
                   <div className="flex flex-col items-start gap-1">
                     <span
@@ -504,13 +505,15 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                               ? 'border-yellow-700 bg-yellow-50 text-yellow-800'
                               : syncStatus === 'error'
                                 ? 'border-red-700 bg-red-50 text-red-800'
+                                : syncStatus === 'signed_out'
+                                  ? 'border-orange-700 bg-orange-50 text-orange-900'
                                 : 'border-gray-300 bg-gray-50 text-gray-600'
                       }`}
                       title={syncError ?? undefined}
                     >
                       {syncStatus === 'disabled' ? 'Cloud off' : syncStatus}
                     </span>
-                    {syncStatus === 'error' && syncError && (
+                    {(syncStatus === 'error' || syncStatus === 'signed_out') && syncError && (
                       <span className="max-w-[240px] text-[10px] font-semibold leading-tight text-red-700">
                         {syncError}
                       </span>
@@ -526,7 +529,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                       type="button"
                       onClick={() => void syncNow()}
                       className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
-                      disabled={syncStatus === 'syncing'}
+                      disabled={syncStatus === 'syncing' || syncStatus === 'signed_out'}
                       title={syncError ?? 'Sync now'}
                     >
                       <RefreshCw className={`h-4 w-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
@@ -545,11 +548,13 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                 <button
                   type="button"
                   onClick={() => void createShareLink()}
-                  disabled={shareBusy || syncStatus === 'disabled'}
+                  disabled={shareBusy || syncStatus === 'disabled' || !authSession}
                   className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
                   title={
                     syncStatus === 'disabled'
                       ? 'Enable Supabase env keys to create share links'
+                      : !authSession
+                        ? 'Sign in to create share links'
                       : 'Create a read-only share snapshot for the current range'
                   }
                 >

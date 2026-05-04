@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import type { ProfitTrade, TradeStatus } from '../types/trade';
 import {
   buildTradesExport,
@@ -7,7 +8,7 @@ import {
   saveTrades,
 } from '../lib/tradesPersist';
 import { syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
-import { supabaseEnabled } from '../lib/supabaseClient';
+import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -27,9 +28,11 @@ export function useTradesStorage() {
   }, [allTrades]);
   const trades = allTrades.filter((t) => !t.deletedAt);
   const [storageError, setStorageError] = useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
-    supabaseEnabled ? 'syncing' : 'disabled'
-  );
+  const [authSession, setAuthSession] = useState<Session | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => {
+    if (!supabaseEnabled) return 'disabled';
+    return 'signed_out';
+  });
   const [syncError, setSyncError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const syncInFlight = useRef(false);
@@ -105,8 +108,34 @@ export function useTradesStorage() {
     []
   );
 
+  const refreshSession = useCallback(async () => {
+    if (!supabaseEnabled || !supabase) {
+      setAuthSession(null);
+      return;
+    }
+    const { data } = await supabase.auth.getSession();
+    setAuthSession(data.session);
+  }, []);
+
+  useEffect(() => {
+    void refreshSession();
+    if (!supabaseEnabled || !supabase) return;
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthSession(session);
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
+  }, [refreshSession]);
+
   const syncNow = useCallback(async () => {
     if (!supabaseEnabled) return;
+    if (!authSession) {
+      setSyncStatus('signed_out');
+      setSyncError('Sign in to sync');
+      setLastSyncAt(nowIso());
+      return;
+    }
     if (syncInFlight.current) return;
     syncInFlight.current = true;
     setSyncStatus('syncing');
@@ -122,7 +151,11 @@ export function useTradesStorage() {
         ),
       ]);
       setSyncStatus(res.status);
-      setSyncError(res.status === 'error' ? res.error ?? 'Sync failed' : null);
+      if (res.status === 'synced') setSyncError(null);
+      else if (res.status === 'signed_out') setSyncError(res.error ?? 'Sign in to sync');
+      else if (res.status === 'error') setSyncError(res.error ?? 'Sync failed');
+      else if (res.status === 'offline') setSyncError(null);
+      else setSyncError(null);
       setLastSyncAt(nowIso());
     } catch (e) {
       setSyncStatus('error');
@@ -131,7 +164,7 @@ export function useTradesStorage() {
     } finally {
       syncInFlight.current = false;
     }
-  }, []);
+  }, [authSession]);
 
   useEffect(() => {
     if (syncWatchdog.current) {
@@ -154,6 +187,10 @@ export function useTradesStorage() {
 
   useEffect(() => {
     if (!supabaseEnabled) return;
+    if (!authSession) {
+      setSyncStatus('signed_out');
+      return;
+    }
     void syncNow();
     // Periodic sync, but don't hammer when in persistent error state.
     const t = window.setInterval(() => {
@@ -163,7 +200,7 @@ export function useTradesStorage() {
       void syncNow();
     }, 30_000);
     return () => window.clearInterval(t);
-  }, [syncNow, syncError]);
+  }, [syncNow, syncError, authSession]);
 
   return {
     trades,
@@ -180,5 +217,7 @@ export function useTradesStorage() {
     syncError,
     syncNow,
     lastSyncAt,
+    authSession,
+    refreshSession,
   };
 }
