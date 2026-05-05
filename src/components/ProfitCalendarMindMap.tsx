@@ -62,6 +62,7 @@ function fmtQtyCell(n: unknown): string {
 const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
 const DISPLAY_TZ = 'Europe/Amsterdam';
 const DISPLAY_LOCALE: string | undefined = undefined;
+const LS_OPEN_PRICES = 'mw3-open-prices-v1';
 
 function parsePlanTarget(notes: string | null | undefined): number | null {
   const text = typeof notes === 'string' ? notes : '';
@@ -316,14 +317,40 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const openTrades = useMemo(() => sortedTrades.filter((t) => t.status === 'open'), [sortedTrades]);
   const closedTrades = useMemo(() => sortedTrades.filter((t) => t.status === 'closed'), [sortedTrades]);
 
-  const [openPrices, setOpenPrices] = useState<Record<string, number | null>>({});
-  const [openPricesUpdatedAt, setOpenPricesUpdatedAt] = useState<string | null>(null);
+  const [openPrices, setOpenPrices] = useState<Record<string, number | null>>(() => {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+      const raw = localStorage.getItem(LS_OPEN_PRICES);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object') return {};
+      const p = parsed as { prices?: Record<string, number | null> };
+      return p.prices && typeof p.prices === 'object' ? p.prices : {};
+    } catch {
+      return {};
+    }
+  });
+  const [openPricesUpdatedAt, setOpenPricesUpdatedAt] = useState<string | null>(() => {
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(LS_OPEN_PRICES);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object') return null;
+      const p = parsed as { updatedAt?: string };
+      return typeof p.updatedAt === 'string' ? p.updatedAt : null;
+    } catch {
+      return null;
+    }
+  });
+  const [openPricesError, setOpenPricesError] = useState<string | null>(null);
 
   useEffect(() => {
     if (readOnly) return;
     if (openTrades.length === 0) {
       setOpenPrices({});
       setOpenPricesUpdatedAt(null);
+      setOpenPricesError(null);
       return;
     }
     const rows = openTrades.map((t) => ({
@@ -338,9 +365,19 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
         const data = await fetchOpenTradeUsdPrices(rows, ac.signal);
         if (ac.signal.aborted) return;
         setOpenPrices(data);
-        setOpenPricesUpdatedAt(new Date().toISOString());
+        const at = new Date().toISOString();
+        setOpenPricesUpdatedAt(at);
+        setOpenPricesError(null);
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(LS_OPEN_PRICES, JSON.stringify({ updatedAt: at, prices: data }));
+          } catch {
+            // ignore
+          }
+        }
       } catch {
-        // ignore; keep last good
+        // Keep last good (including persisted cache), but surface status so the user knows why it's stale/empty.
+        setOpenPricesError('Price feed unavailable (rate limit or network). Retrying…');
       }
     };
     void run();
@@ -1247,6 +1284,9 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                   {openPricesUpdatedAt ? formatDateTime(openPricesUpdatedAt) : '—'}
                 </span>{' '}
                 ({DISPLAY_TZ})
+                {openPricesError && (
+                  <span className="ml-2 font-semibold text-red-700">{openPricesError}</span>
+                )}
               </p>
             )}
             <div className="overflow-x-auto rounded-xl border-2 border-black">
