@@ -1,4 +1,5 @@
 import type { ProfitTrade } from '../types/trade';
+import { normalizeIsoMidnightToMiddayUtc } from './profitTradeDates';
 
 export const TRADES_STORAGE_KEY = 'mw3-profit-trades-v1';
 export const TRADES_SCHEMA_VERSION = 1 as const;
@@ -26,12 +27,18 @@ function normalizeTrade(t: unknown): ProfitTrade | null {
   const updatedAt = typeof x.updatedAt === 'string' ? x.updatedAt : new Date().toISOString();
   const deletedAt =
     x.deletedAt == null ? null : typeof x.deletedAt === 'string' ? x.deletedAt : null;
+  const openedAt = normalizeIsoMidnightToMiddayUtc(
+    typeof x.openedAt === 'string' ? x.openedAt : null
+  );
+  const closedAt = normalizeIsoMidnightToMiddayUtc(
+    typeof x.closedAt === 'string' ? x.closedAt : null
+  );
   return {
     id: String(x.id),
     coinGeckoId: String(x.coinGeckoId),
     symbol: String(x.symbol ?? '?'),
-    openedAt: String(x.openedAt ?? new Date().toISOString()),
-    closedAt: x.closedAt ?? null,
+    openedAt: openedAt ?? new Date().toISOString(),
+    closedAt: closedAt,
     entryPrice: Number(x.entryPrice),
     exitPrice: x.exitPrice ?? null,
     realizedPnlUsd: pnl,

@@ -1,5 +1,6 @@
 import type { ProfitTrade } from '../types/trade';
 import { isAdminSession } from './adminAccess';
+import { normalizeIsoMidnightToMiddayUtc } from './profitTradeDates';
 import { supabase, supabaseEnabled } from './supabaseClient';
 
 export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error' | 'signed_out';
@@ -81,8 +82,13 @@ export async function syncTradesOnce(
         id: String(r.id),
         coinGeckoId: String(payload.coinGeckoId ?? ''),
         symbol: String(payload.symbol ?? '?'),
-        openedAt: String(payload.openedAt ?? nowIso()),
-        closedAt: (payload.closedAt as string | null) ?? null,
+        openedAt:
+          normalizeIsoMidnightToMiddayUtc(
+            typeof payload.openedAt === 'string' ? payload.openedAt : null
+          ) ?? nowIso(),
+        closedAt: normalizeIsoMidnightToMiddayUtc(
+          typeof payload.closedAt === 'string' ? payload.closedAt : null
+        ),
         entryPrice: Number(payload.entryPrice ?? 0),
         exitPrice: (payload.exitPrice as number | null) ?? null,
         realizedPnlUsd: payload.realizedPnlUsd ?? null,
