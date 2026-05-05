@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Target,
   Trash2,
   Upload,
   Image as ImageIcon,
@@ -68,6 +69,17 @@ function parsePlanTarget(notes: string | null | undefined): number | null {
   if (!m?.[1]) return null;
   const n = parseFloat(m[1].replace(/,/g, ''));
   return Number.isFinite(n) ? n : null;
+}
+
+function upsertPlanTarget(notes: string | null | undefined, target: number | null): string {
+  const base = typeof notes === 'string' ? notes.trim() : '';
+  const without = base
+    .replace(/\s*·?\s*plan\s+target:\s*[0-9][0-9,]*\.?[0-9]*\s*/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (target == null || !Number.isFinite(target)) return without;
+  const pt = `Plan target: ${target}`;
+  return without ? `${without} · ${pt}` : pt;
 }
 
 function formatDay(d: Date) {
@@ -218,6 +230,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const [linkTargetId, setLinkTargetId] = useState<string | null>(null);
   const [linkValue, setLinkValue] = useState('');
   const [shareBusy, setShareBusy] = useState(false);
+  const [targetEditTrade, setTargetEditTrade] = useState<ProfitTrade | null>(null);
+  const [targetEditValue, setTargetEditValue] = useState('');
 
   const [entryPrice, setEntryPrice] = useState('1');
   const [qty, setQty] = useState('1000');
@@ -442,6 +456,17 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     closeTrade(closeTarget.id, x);
     setCloseTarget(null);
     setCloseExit('');
+  };
+
+  const submitTargetEdit = () => {
+    if (!targetEditTrade) return;
+    const raw = targetEditValue.trim();
+    const n = raw ? parseFloat(raw) : NaN;
+    const nextTarget = Number.isFinite(n) ? n : null;
+    const nextNotes = upsertPlanTarget(targetEditTrade.notes, nextTarget);
+    updateTrade(targetEditTrade.id, { notes: nextNotes });
+    setTargetEditTrade(null);
+    setTargetEditValue('');
   };
 
   const grid = useMemo(() => monthGrid(cursor), [cursor]);
@@ -1366,6 +1391,19 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                               <button
                                 type="button"
                                 onClick={() => {
+                                  setTargetEditTrade(t);
+                                  const current = parsePlanTarget(t.notes);
+                                  setTargetEditValue(current != null ? String(current) : '');
+                                }}
+                                className="mr-2 inline-flex items-center rounded border border-black p-1 hover:bg-black hover:text-white"
+                                aria-label="Edit plan target"
+                                title="Edit plan target"
+                              >
+                                <Target className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
                                   setCloseTarget(t);
                                   setCloseExit('');
                                   const cid =
@@ -1566,6 +1604,69 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
           setLinkTargetId(null);
         }}
       />
+
+      {targetEditTrade && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-4 md:items-center"
+          role="presentation"
+          onClick={() => setTargetEditTrade(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-md rounded-2xl border-2 border-black bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-2">
+              <div>
+                <h2 className="font-serif text-xl font-bold">Edit plan target</h2>
+                <p className="mt-2 text-sm text-gray-600">
+                  {targetEditTrade.symbol} · {targetEditTrade.position}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-full border border-black p-2 hover:bg-black hover:text-white"
+                aria-label="Close"
+                onClick={() => setTargetEditTrade(null)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <label className="block text-sm font-semibold">
+              Target (USD)
+              <input
+                className="mt-2 w-full rounded-xl border-2 border-black px-3 py-2 text-sm"
+                inputMode="decimal"
+                value={targetEditValue}
+                onChange={(e) => setTargetEditValue(e.target.value)}
+                placeholder="e.g. 0.20"
+              />
+            </label>
+            <p className="mt-2 text-xs text-gray-500">
+              Leave blank to clear the target (Progress will show —).
+            </p>
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white"
+                onClick={() => setTargetEditTrade(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-full border-2 border-black bg-black px-4 py-2 text-xs font-bold uppercase tracking-wide text-white hover:bg-gray-900"
+                onClick={submitTargetEdit}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
