@@ -44,6 +44,7 @@ import TradeLinkModal from './profit/TradeLinkModal';
 import ProfitAuthBar from './profit/ProfitAuthBar';
 import MindMapCloseButton from './mind-map/MindMapCloseButton';
 import type { ProfitTrade } from '../types/trade';
+import { dateInputToStableIso } from '../lib/profitTradeDates';
 
 type CalMode = 'day' | 'week' | 'month';
 
@@ -60,16 +61,6 @@ function fmtQtyCell(n: unknown): string {
 const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
 const DISPLAY_TZ = 'Europe/Amsterdam';
 const DISPLAY_LOCALE: string | undefined = undefined;
-
-function dateInputToStableIso(dateOnly: string): string | null {
-  // HTML date input gives YYYY-MM-DD. If we store "midnight local", it can shift
-  // across days when formatted/compared in different timezones (DST etc).
-  // Storing midday UTC keeps the calendar day stable everywhere.
-  const t = dateOnly.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
-  const d = new Date(`${t}T12:00:00.000Z`);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
-}
 
 function parsePlanTarget(notes: string | null | undefined): number | null {
   const text = typeof notes === 'string' ? notes : '';

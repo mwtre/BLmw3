@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Image as ImageIcon, Loader2, RefreshCw, Search, X } from 'lucide-react';
 import { POPULAR_COIN_IDS, searchCoins } from '../../lib/coingecko';
+import { dateInputToStableIso } from '../../lib/profitTradeDates';
 import {
   coingeckoIdForTicker,
   extractOrderedPrices,
@@ -352,6 +353,12 @@ export default function ScreenshotImportModal({
       return;
     }
     if (asClosed) {
+      const openedIso = dateInputToStableIso(openedAt);
+      const closedIso = dateInputToStableIso(closedAt);
+      if (!openedIso || !closedIso) {
+        setErr('Pick valid opened/closed dates.');
+        return;
+      }
       const xp = parseFloat(exitPrice);
       const pnl = pnlOverride.trim() ? parseFloat(pnlOverride) : NaN;
       if (!Number.isFinite(xp) && !Number.isFinite(pnl)) {
@@ -361,8 +368,8 @@ export default function ScreenshotImportModal({
       onConfirm({
         coinGeckoId: priceCoinId,
         symbol: symbolLabel,
-        openedAt: new Date(openedAt).toISOString(),
-        closedAt: new Date(closedAt).toISOString(),
+        openedAt: openedIso,
+        closedAt: closedIso,
         entryPrice: ep,
         exitPrice: Number.isFinite(xp) ? xp : null,
         realizedPnlUsd: Number.isFinite(pnl) ? pnl : null,
@@ -376,10 +383,15 @@ export default function ScreenshotImportModal({
       });
       return;
     }
+    const openedIso = dateInputToStableIso(openedAt);
+    if (!openedIso) {
+      setErr('Pick a valid opened date.');
+      return;
+    }
     onConfirm({
       coinGeckoId: priceCoinId,
       symbol: symbolLabel,
-      openedAt: new Date(openedAt).toISOString(),
+      openedAt: openedIso,
       closedAt: null,
       entryPrice: ep,
       exitPrice: null,
