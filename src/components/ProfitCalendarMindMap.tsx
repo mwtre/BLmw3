@@ -117,6 +117,12 @@ function pctTone(v: number | null | undefined) {
   return 'text-black';
 }
 
+function coinLogoUrl(coinId: string | null | undefined): string | null {
+  const id = normalizeToPaprikaCoinId(coinId ?? '');
+  if (!id) return null;
+  return `https://static.coinpaprika.com/coin/${encodeURIComponent(id)}/logo.png`;
+}
+
 function KpiCard({
   title,
   headline,
@@ -1311,7 +1317,21 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                     return (
                       <tr key={t.id} className="border-t border-gray-200 odd:bg-gray-50">
                         <td className="px-3 py-2 font-semibold">
-                          {t.symbol}
+                          <span className="inline-flex items-center gap-2">
+                            {coinLogoUrl(t.coinGeckoId) && (
+                              <img
+                                src={coinLogoUrl(t.coinGeckoId)!}
+                                alt=""
+                                className="h-5 w-5 rounded-full"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            )}
+                            <span>{t.symbol}</span>
+                          </span>
                           <span className="ml-2 text-xs text-gray-500">{t.position}</span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
@@ -1481,7 +1501,21 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                     return (
                       <tr key={t.id} className="border-t border-gray-200 odd:bg-gray-50">
                         <td className="px-3 py-2 font-semibold">
-                          {t.symbol}
+                          <span className="inline-flex items-center gap-2">
+                            {coinLogoUrl(t.coinGeckoId) && (
+                              <img
+                                src={coinLogoUrl(t.coinGeckoId)!}
+                                alt=""
+                                className="h-5 w-5 rounded-full"
+                                loading="lazy"
+                                referrerPolicy="no-referrer"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            )}
+                            <span>{t.symbol}</span>
+                          </span>
                           <span className="ml-2 text-xs text-gray-500">{t.position}</span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
