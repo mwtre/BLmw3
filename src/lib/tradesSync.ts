@@ -5,8 +5,8 @@ import { supabase, supabaseEnabled } from './supabaseClient';
 
 export type SyncStatus = 'disabled' | 'offline' | 'syncing' | 'synced' | 'error' | 'signed_out';
 
-const LS_LAST_PULL = 'mw3-supabase-trades-last-pull';
-const LS_LAST_PUSH = 'mw3-supabase-trades-last-push';
+export const LS_LAST_PULL = 'mw3-supabase-trades-last-pull';
+export const LS_LAST_PUSH = 'mw3-supabase-trades-last-push';
 
 /** Cap rows per pull so public “full ledger” reads cannot freeze the browser on huge tables. */
 const MAX_PUBLIC_PULL_ROWS = 10_000;

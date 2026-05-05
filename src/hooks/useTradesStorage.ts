@@ -8,7 +8,7 @@ import {
   TRADES_STORAGE_KEY,
   saveTrades,
 } from '../lib/tradesPersist';
-import { syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
+import { LS_LAST_PULL, LS_LAST_PUSH, syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
 import { adminEmailConfigured, isAdminSession } from '../lib/adminAccess';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
@@ -190,6 +190,8 @@ export function useTradesStorage() {
     if (typeof localStorage !== 'undefined') {
       try {
         localStorage.removeItem(TRADES_STORAGE_KEY);
+        localStorage.removeItem(LS_LAST_PULL);
+        localStorage.removeItem(LS_LAST_PUSH);
       } catch {
         // ignore
       }
