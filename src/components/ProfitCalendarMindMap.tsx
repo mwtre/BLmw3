@@ -1320,13 +1320,23 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                             '—'
                           ) : (
                             <div className="flex items-center gap-2">
-                              <div className="h-2 w-24 overflow-hidden rounded-full border border-black bg-white">
-                                <div
-                                  className="h-full bg-black"
-                                  style={{ width: `${Math.round(progClamped * 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-xs font-bold">{Math.round(progClamped * 100)}%</span>
+                              {(() => {
+                                const pct = progClamped * 100;
+                                const width =
+                                  pct <= 0 ? 0 : pct > 0 && pct < 1 ? 1 : Math.round(pct);
+                                const label = pct > 0 && pct < 1 ? '<1%' : `${Math.round(pct)}%`;
+                                return (
+                                  <>
+                                    <div className="h-2 w-24 overflow-hidden rounded-full border border-black bg-white">
+                                      <div
+                                        className="h-full bg-black"
+                                        style={{ width: `${width}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-bold">{label}</span>
+                                  </>
+                                );
+                              })()}
                             </div>
                           )}
                         </td>
