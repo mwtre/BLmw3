@@ -164,6 +164,15 @@ function tradeOnDay(t: ProfitTrade, day: Date): boolean {
   return dKey === oKey;
 }
 
+function tradeEventOnDay(t: ProfitTrade, day: Date): boolean {
+  // "Event" view: only show trades that opened or closed on this day (no spanning open positions).
+  const dKey = localYmd(day);
+  const oKey = localYmd(new Date(t.openedAt));
+  if (t.status === 'open') return dKey === oKey;
+  const cKey = t.closedAt ? localYmd(new Date(t.closedAt)) : null;
+  return cKey ? dKey === cKey : dKey === oKey;
+}
+
 interface ProfitCalendarMindMapProps {
   onClose: () => void;
 }
@@ -1153,11 +1162,11 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               );
             })()}
             <ul className="space-y-2">
-              {trades.filter((t) => tradeOnDay(t, cursor)).length === 0 && (
+              {trades.filter((t) => tradeEventOnDay(t, cursor)).length === 0 && (
                 <li className="text-sm text-gray-500">No trades on this day.</li>
               )}
               {trades
-                .filter((t) => tradeOnDay(t, cursor))
+                .filter((t) => tradeEventOnDay(t, cursor))
                 .map((t) => (
                   <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                     <span>
