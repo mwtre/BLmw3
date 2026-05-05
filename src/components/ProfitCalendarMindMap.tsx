@@ -58,6 +58,8 @@ function fmtQtyCell(n: unknown): string {
 }
 
 const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
+const DISPLAY_TZ = 'Europe/Amsterdam';
+const DISPLAY_LOCALE: string | undefined = undefined;
 
 function parsePlanTarget(notes: string | null | undefined): number | null {
   const text = typeof notes === 'string' ? notes : '';
@@ -68,7 +70,18 @@ function parsePlanTarget(notes: string | null | undefined): number | null {
 }
 
 function formatDay(d: Date) {
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString(DISPLAY_LOCALE, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: DISPLAY_TZ,
+  });
+}
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(DISPLAY_LOCALE, { timeZone: DISPLAY_TZ });
 }
 
 function localYmd(d: Date) {
@@ -263,11 +276,13 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
   const closedTrades = useMemo(() => sortedTrades.filter((t) => t.status === 'closed'), [sortedTrades]);
 
   const [openPrices, setOpenPrices] = useState<Record<string, number | null>>({});
+  const [openPricesUpdatedAt, setOpenPricesUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (readOnly) return;
     if (openTrades.length === 0) {
       setOpenPrices({});
+      setOpenPricesUpdatedAt(null);
       return;
     }
     const rows = openTrades.map((t) => ({
@@ -282,6 +297,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
         const data = await fetchOpenTradeUsdPrices(rows, ac.signal);
         if (ac.signal.aborted) return;
         setOpenPrices(data);
+        setOpenPricesUpdatedAt(new Date().toISOString());
       } catch {
         // ignore; keep last good
       }
@@ -1145,6 +1161,15 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
         <section className="space-y-10">
           <div>
             <h3 className="mb-4 font-serif text-xl font-bold">Open trades ({openTrades.length})</h3>
+            {openTrades.length > 0 && (
+              <p className="-mt-2 mb-3 text-xs text-gray-500">
+                Prices updated:{' '}
+                <span className="font-medium">
+                  {openPricesUpdatedAt ? formatDateTime(openPricesUpdatedAt) : '—'}
+                </span>{' '}
+                ({DISPLAY_TZ})
+              </p>
+            )}
             <div className="overflow-x-auto rounded-xl border-2 border-black">
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="bg-black text-white">
@@ -1217,7 +1242,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                           <span className="ml-2 text-xs text-gray-500">{t.position}</span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          {new Date(t.openedAt).toLocaleString()}
+                          {formatDateTime(t.openedAt)}
                         </td>
                         <td className="px-3 py-2">{fmtUsdCell(t.entryPrice)}</td>
                         <td className="px-3 py-2">{target != null ? `$${target.toFixed(2)}` : '—'}</td>
@@ -1367,7 +1392,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                           <span className="ml-2 text-xs text-gray-500">{t.position}</span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          {t.closedAt ? new Date(t.closedAt).toLocaleString() : '—'}
+                          {t.closedAt ? formatDateTime(t.closedAt) : '—'}
                         </td>
                         <td className="px-3 py-2">{fmtUsdCell(t.entryPrice)}</td>
                         <td className="px-3 py-2">

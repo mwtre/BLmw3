@@ -47,6 +47,7 @@ const LEGACY_COINGECKO_TO_PAPRICA: Record<string, string> = {
   kybernetworkcrystal: 'knc-kyber-network',
   apecoin: 'ape-apecoin',
   hivemapper: 'honey-hivemapper',
+  lords: 'lords-lords',
 };
 
 let globalRateLimitUntil = 0;
