@@ -114,7 +114,7 @@ function KpiCard({
   title: string;
   headline: React.ReactNode;
   subtitle?: React.ReactNode;
-  rows?: { k: string; v: React.ReactNode }[];
+  rows?: { k: string; v: React.ReactNode; emphasis?: 'high' | 'low' }[];
 }) {
   return (
     <div className="rounded-2xl border-2 border-black bg-white p-3 shadow-sm">
@@ -128,7 +128,17 @@ function KpiCard({
           {rows.map((r) => (
             <div key={r.k} className="rounded-lg border border-black/10 bg-gray-50 px-2 py-1">
               <dt className="text-[10px] font-bold uppercase tracking-wide text-gray-500">{r.k}</dt>
-              <dd className="font-bold text-black">{r.v}</dd>
+              <dd
+                className={
+                  r.emphasis === 'high'
+                    ? 'font-extrabold text-black'
+                    : r.emphasis === 'low'
+                      ? 'font-semibold text-gray-500'
+                      : 'font-bold text-black'
+                }
+              >
+                {r.v}
+              </dd>
             </div>
           ))}
         </dl>
@@ -738,8 +748,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               subtitle={`${todayStats.closed} closed · $${todayStats.pnlUsd.toFixed(2)}`}
               rows={[
                 { k: 'weighted', v: fmtPct(todayStats.pnlPctEquityWeighted) },
-                { k: 'sum %', v: fmtPct(todayStats.pnlPctSum) },
-                { k: 'avg %', v: fmtPct(todayStats.pnlPctAvg) },
+                { k: 'sum %', v: fmtPct(todayStats.pnlPctSum), emphasis: 'high' },
+                { k: 'avg %', v: fmtPct(todayStats.pnlPctAvg), emphasis: 'low' },
               ]}
             />
             <KpiCard
@@ -752,8 +762,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               subtitle={`${yearStats.closed} closed · $${yearStats.pnlUsd.toFixed(2)}`}
               rows={[
                 { k: 'weighted', v: fmtPct(yearStats.pnlPctEquityWeighted) },
-                { k: 'sum %', v: fmtPct(yearStats.pnlPctSum) },
-                { k: 'avg %', v: fmtPct(yearStats.pnlPctAvg) },
+                { k: 'sum %', v: fmtPct(yearStats.pnlPctSum), emphasis: 'high' },
+                { k: 'avg %', v: fmtPct(yearStats.pnlPctAvg), emphasis: 'low' },
               ]}
             />
             <KpiCard
@@ -766,8 +776,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               subtitle={`Range: ${rangeLabel} · ${rangeStats.closed} closed · $${rangeStats.pnlUsd.toFixed(2)}`}
               rows={[
                 { k: 'weighted', v: fmtPct(rangeStats.pnlPctEquityWeighted) },
-                { k: 'sum %', v: fmtPct(rangeStats.pnlPctSum) },
-                { k: 'avg %', v: fmtPct(rangeStats.pnlPctAvg) },
+                { k: 'sum %', v: fmtPct(rangeStats.pnlPctSum), emphasis: 'high' },
+                { k: 'avg %', v: fmtPct(rangeStats.pnlPctAvg), emphasis: 'low' },
               ]}
             />
           </section>
