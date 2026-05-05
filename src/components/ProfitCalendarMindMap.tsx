@@ -1328,10 +1328,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                                 return (
                                   <>
                                     <div className="h-2 w-24 overflow-hidden rounded-full border border-black bg-white">
-                                      <div
-                                        className="h-full bg-black"
-                                        style={{ width: `${width}%` }}
-                                      />
+                                      <div className="h-full bg-black" style={{ width: `${width}%` }} />
                                     </div>
                                     <span className="text-xs font-bold">{label}</span>
                                   </>
