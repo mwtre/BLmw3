@@ -210,11 +210,10 @@ export function useTradesStorage() {
     const kick = window.setTimeout(() => {
       void syncNow();
     }, 0);
-    // Periodic sync for admins only (guest/public reads sync on mount + manual refresh).
-    if (!admin) {
-      return () => window.clearTimeout(kick);
-    }
-    const intervalMs = 120_000;
+    // Periodic auto-sync:
+    // - Admin: pull+push every 2 min (when healthy)
+    // - Guest/signed-out: pull-only every 5 min so localhost stays in sync with "live" changes.
+    const intervalMs = admin ? 120_000 : 300_000;
     const t = window.setInterval(() => {
       if (syncInFlight.current) return;
       // If the last attempt errored, require a manual click to retry (read ref — do not depend on syncError).
