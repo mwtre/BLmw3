@@ -741,42 +741,42 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
             <KpiCard
               title="Today"
               headline={
-                <span className={pctTone(todayStats.pnlPctEquityWeighted)}>
-                  {fmtPct(todayStats.pnlPctEquityWeighted)}
+                <span className={pctTone(todayStats.pnlPctSum)}>
+                  {fmtPct(todayStats.pnlPctSum)}
                 </span>
               }
               subtitle={`${todayStats.closed} closed · $${todayStats.pnlUsd.toFixed(2)}`}
               rows={[
-                { k: 'weighted', v: fmtPct(todayStats.pnlPctEquityWeighted) },
                 { k: 'sum %', v: fmtPct(todayStats.pnlPctSum), emphasis: 'high' },
+                { k: 'weighted', v: fmtPct(todayStats.pnlPctEquityWeighted) },
                 { k: 'avg %', v: fmtPct(todayStats.pnlPctAvg), emphasis: 'low' },
               ]}
             />
             <KpiCard
               title={`Year ${new Date().getFullYear()}`}
               headline={
-                <span className={pctTone(yearStats.pnlPctEquityWeighted)}>
-                  {fmtPct(yearStats.pnlPctEquityWeighted)}
+                <span className={pctTone(yearStats.pnlPctSum)}>
+                  {fmtPct(yearStats.pnlPctSum)}
                 </span>
               }
               subtitle={`${yearStats.closed} closed · $${yearStats.pnlUsd.toFixed(2)}`}
               rows={[
-                { k: 'weighted', v: fmtPct(yearStats.pnlPctEquityWeighted) },
                 { k: 'sum %', v: fmtPct(yearStats.pnlPctSum), emphasis: 'high' },
+                { k: 'weighted', v: fmtPct(yearStats.pnlPctEquityWeighted) },
                 { k: 'avg %', v: fmtPct(yearStats.pnlPctAvg), emphasis: 'low' },
               ]}
             />
             <KpiCard
               title={`In view · ${mode}`}
               headline={
-                <span className={pctTone(rangeStats.pnlPctEquityWeighted)}>
-                  {fmtPct(rangeStats.pnlPctEquityWeighted)}
+                <span className={pctTone(rangeStats.pnlPctSum)}>
+                  {fmtPct(rangeStats.pnlPctSum)}
                 </span>
               }
               subtitle={`Range: ${rangeLabel} · ${rangeStats.closed} closed · $${rangeStats.pnlUsd.toFixed(2)}`}
               rows={[
-                { k: 'weighted', v: fmtPct(rangeStats.pnlPctEquityWeighted) },
                 { k: 'sum %', v: fmtPct(rangeStats.pnlPctSum), emphasis: 'high' },
+                { k: 'weighted', v: fmtPct(rangeStats.pnlPctEquityWeighted) },
                 { k: 'avg %', v: fmtPct(rangeStats.pnlPctAvg), emphasis: 'low' },
               ]}
             />
