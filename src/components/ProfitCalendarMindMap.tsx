@@ -737,6 +737,16 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
               title="Overall"
               headline={`$${stats.total.toFixed(2)}`}
               subtitle={`${stats.closed} closed · ${stats.wins}W / ${stats.losses}L · ${trades.length} rows`}
+              rows={[
+                {
+                  k: 'win rate',
+                  v:
+                    stats.closed > 0
+                      ? `${((stats.wins / stats.closed) * 100).toFixed(1)}%`
+                      : '—',
+                  emphasis: 'high',
+                },
+              ]}
             />
             <KpiCard
               title="Today"
