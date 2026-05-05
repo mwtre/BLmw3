@@ -61,6 +61,16 @@ const BUILD = (import.meta.env.VITE_APP_BUILD as string | undefined) ?? '';
 const DISPLAY_TZ = 'Europe/Amsterdam';
 const DISPLAY_LOCALE: string | undefined = undefined;
 
+function dateInputToStableIso(dateOnly: string): string | null {
+  // HTML date input gives YYYY-MM-DD. If we store "midnight local", it can shift
+  // across days when formatted/compared in different timezones (DST etc).
+  // Storing midday UTC keeps the calendar day stable everywhere.
+  const t = dateOnly.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+  const d = new Date(`${t}T12:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 function parsePlanTarget(notes: string | null | undefined): number | null {
   const text = typeof notes === 'string' ? notes : '';
   const m = text.match(/plan\s+target:\s*([0-9][0-9,]*\.?[0-9]*)/i);
@@ -172,6 +182,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
     syncStatus,
     syncError,
     syncNow,
+    resetFromCloud,
     lastSyncAt,
     authSession,
     refreshSession,
@@ -387,8 +398,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       setFormSubmitError('Enter a valid equity amount (USD).');
       return;
     }
-    const opened = new Date(openedAt);
-    if (Number.isNaN(opened.getTime())) {
+    const openedIso = dateInputToStableIso(openedAt);
+    if (!openedIso) {
       setFormSubmitError('Pick a valid opened date.');
       return;
     }
@@ -399,7 +410,7 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
       coinGeckoId:
         typeof priceCoinId === 'string' && priceCoinId.trim() ? priceCoinId.trim() : 'btc-bitcoin',
       symbol: symbolLabel,
-      openedAt: new Date(openedAt).toISOString(),
+      openedAt: openedIso,
       closedAt: null,
       entryPrice: ep,
       exitPrice: null,
@@ -622,6 +633,23 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                     >
                       <RefreshCw className={`h-4 w-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
                       {readOnly ? 'Refresh' : 'Sync'}
+                    </button>
+                  )}
+                  {!readOnly && syncStatus !== 'disabled' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ok = window.confirm(
+                          'Reset local ledger and pull from cloud? This will overwrite your local-only changes.'
+                        );
+                        if (!ok) return;
+                        void resetFromCloud();
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-2 text-xs font-bold uppercase tracking-wide hover:bg-black hover:text-white disabled:opacity-50"
+                      disabled={syncStatus === 'syncing'}
+                      title="Force localhost to match cloud data"
+                    >
+                      Reset
                     </button>
                   )}
                 </div>
@@ -1119,8 +1147,8 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                   {agg.pnlPctEquityWeighted != null
                     ? `${agg.pnlPctEquityWeighted.toFixed(2)}%`
                     : '—'}{' '}
-                  · ${agg.pnlUsd.toFixed(2)} (equity ${agg.equityUsd.toFixed(0)}) · avg{' '}
-                  {agg.pnlPctAvg != null ? `${agg.pnlPctAvg.toFixed(2)}%` : '—'}
+                  · ${agg.pnlUsd.toFixed(2)} (equity ${agg.equityUsd.toFixed(0)}) · sum{' '}
+                  {Number.isFinite(agg.pnlPctSum) ? `${agg.pnlPctSum.toFixed(2)}%` : '—'}
                 </div>
               );
             })()}

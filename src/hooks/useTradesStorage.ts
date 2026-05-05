@@ -5,6 +5,7 @@ import {
   buildTradesExport,
   loadTrades,
   parseTradesImport,
+  TRADES_STORAGE_KEY,
   saveTrades,
 } from '../lib/tradesPersist';
 import { syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
@@ -107,9 +108,12 @@ export function useTradesStorage() {
         const parsed = JSON.parse(text) as unknown;
         const result = parseTradesImport(parsed);
         if ('error' in result) return { ok: false, error: result.error };
+        // Treat import as authoritative: bump updatedAt so sync merge doesn't immediately "revert"
+        // back to an older remote copy with a newer timestamp.
+        const ts = nowIso();
         const normalized = result.trades.map((t) => ({
           ...t,
-          updatedAt: t.updatedAt ?? nowIso(),
+          updatedAt: ts,
           deletedAt: t.deletedAt ?? null,
         }));
         setAllTrades(normalized);
@@ -180,6 +184,20 @@ export function useTradesStorage() {
     }
   }, [authSession]);
 
+  const resetFromCloud = useCallback(async () => {
+    // If local is "winning" merges (newer updatedAt) you can get stuck with wrong days.
+    // Clearing local state forces next pull to repopulate from remote.
+    if (typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(TRADES_STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    }
+    setAllTrades([]);
+    await syncNow();
+  }, [syncNow]);
+
   useEffect(() => {
     if (syncWatchdog.current) {
       window.clearTimeout(syncWatchdog.current);
@@ -240,6 +258,7 @@ export function useTradesStorage() {
     syncStatus,
     syncError,
     syncNow,
+    resetFromCloud,
     lastSyncAt,
     authSession,
     refreshSession,
