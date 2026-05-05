@@ -1071,10 +1071,10 @@ const ProfitCalendarMindMap: React.FC<ProfitCalendarMindMapProps> = ({ onClose }
                             {nClosed} closed
                           </span>
                         )}
-                        {dayAgg.pnlPctEquityWeighted != null && dayAgg.closed > 0 && (
+                        {dayAgg.closed > 0 && Number.isFinite(dayAgg.pnlPctSum) && (
                           <span className="inline-block rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-black border border-black">
-                            {dayAgg.pnlPctEquityWeighted >= 0 ? '+' : ''}
-                            {dayAgg.pnlPctEquityWeighted.toFixed(1)}%
+                            {dayAgg.pnlPctSum >= 0 ? '+' : ''}
+                            {dayAgg.pnlPctSum.toFixed(1)}%
                           </span>
                         )}
                       </div>
