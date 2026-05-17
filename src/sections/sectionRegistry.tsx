@@ -12,6 +12,8 @@ const TradeMindMap = lazy(() => import('../components/TradeMindMap'));
 const NFTMindMap = lazy(() => import('../components/NFTMindMap'));
 const ProfitCalendarMindMap = lazy(() => import('../components/ProfitCalendarMindMap'));
 const ArtMindMap = lazy(() => import('../components/ArtMindMap'));
+const SocialMindMap = lazy(() => import('../components/social/SocialMindMap'));
+const EventsMindMap = lazy(() => import('../components/events/EventsMindMap'));
 
 export const sectionComponents: Record<
   SectionId,
@@ -23,4 +25,6 @@ export const sectionComponents: Record<
   nft: NFTMindMap,
   profit: ProfitCalendarMindMap,
   art: ArtMindMap,
+  social: SocialMindMap,
+  events: EventsMindMap,
 };

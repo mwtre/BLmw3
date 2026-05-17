@@ -9,7 +9,7 @@ import {
   saveTrades,
 } from '../lib/tradesPersist';
 import { LS_LAST_PULL, LS_LAST_PUSH, syncTradesOnce, type SyncStatus } from '../lib/tradesSync';
-import { adminEmailConfigured, isAdminSession } from '../lib/adminAccess';
+import { isAdminSession } from '../lib/adminAccess';
 import { supabase, supabaseEnabled } from '../lib/supabaseClient';
 
 function uid() {

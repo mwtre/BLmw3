@@ -4,4 +4,6 @@ export type SectionId =
   | 'trade'
   | 'nft'
   | 'profit'
-  | 'art';
+  | 'art'
+  | 'social'
+  | 'events';

@@ -1,4 +1,13 @@
-import { ArrowRightLeft, CalendarRange, Clapperboard, Image, Network, TrendingUp } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  CalendarRange,
+  Clapperboard,
+  MapPinned,
+  Image,
+  Network,
+  Share2,
+  TrendingUp,
+} from 'lucide-react';
 import type { SectionId } from '../../types/section';
 import MW3Logo from '/MW3-LOGO-black.svg';
 
@@ -9,11 +18,13 @@ const sections: {
   angle: number;
 }[] = [
   { id: 'dao', label: 'DAO', icon: Network, angle: 0 },
-  { id: 'defi', label: 'DeFi', icon: TrendingUp, angle: 60 },
-  { id: 'trade', label: 'Trade', icon: ArrowRightLeft, angle: 120 },
-  { id: 'nft', label: 'NFT', icon: Image, angle: 180 },
-  { id: 'profit', label: 'Profit', icon: CalendarRange, angle: 240 },
-  { id: 'art', label: 'ART', icon: Clapperboard, angle: 300 },
+  { id: 'defi', label: 'DeFi', icon: TrendingUp, angle: 45 },
+  { id: 'trade', label: 'Trade', icon: ArrowRightLeft, angle: 90 },
+  { id: 'nft', label: 'NFT', icon: Image, angle: 135 },
+  { id: 'profit', label: 'Profit', icon: CalendarRange, angle: 180 },
+  { id: 'art', label: 'ART', icon: Clapperboard, angle: 225 },
+  { id: 'social', label: 'SOCIAL', icon: Share2, angle: 270 },
+  { id: 'events', label: 'EVENTS', icon: MapPinned, angle: 315 },
 ];
 
 interface HomeHubProps {
