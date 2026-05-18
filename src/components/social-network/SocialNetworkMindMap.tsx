@@ -13,6 +13,7 @@ import {
   Sparkles,
   UserRound,
 } from 'lucide-react';
+import { fetchOpenTradeUsdPrices, formatCoingeckoError } from '../../lib/coingecko';
 import { supabase, supabaseEnabled } from '../../lib/supabaseClient';
 import MindMapCloseButton from '../mind-map/MindMapCloseButton';
 
@@ -30,6 +31,12 @@ interface NetworkPost {
   repliesCount: number;
   repostsCount: number;
   createdAt: string;
+}
+
+interface MentionMarket {
+  symbol: string;
+  price: number | null;
+  tone: 'ready' | 'missing';
 }
 
 type NetworkPostRow = {
@@ -50,7 +57,7 @@ const DEMO_POSTS: NetworkPost[] = [
     userId: 'demo',
     authorName: 'MW3 Events',
     handle: '@mw3events',
-    body: 'Amsterdam and Zurich events are live. Cocktails, blockchain games, and trading lessons. Free seats, real community.',
+    body: 'Amsterdam and Zurich events are live. Cocktails, blockchain games, and trading lessons. Watching $BTC and $ETH for the next session.',
     likesCount: 18,
     repliesCount: 4,
     repostsCount: 7,
@@ -61,13 +68,36 @@ const DEMO_POSTS: NetworkPost[] = [
     userId: 'demo',
     authorName: 'MW3 Trading Desk',
     handle: '@mw3trades',
-    body: 'Rule for today: if you cannot explain the invalidation, you do not have a trade. You have a wish.',
+    body: 'Rule for today: if you cannot explain the invalidation, you do not have a trade. You have a wish. $SOL looks interesting only if structure holds.',
     likesCount: 42,
     repliesCount: 9,
     repostsCount: 13,
     createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
   },
 ];
+
+function extractCashtags(text: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const match of text.matchAll(/(?:^|[^\w])\$([A-Za-z][A-Za-z0-9]{1,15})\b/g)) {
+    const symbol = match[1]?.toUpperCase();
+    if (!symbol || seen.has(symbol)) continue;
+    seen.add(symbol);
+    out.push(symbol);
+  }
+  return out.slice(0, 6);
+}
+
+function fmtUsd(price: number | null): string {
+  if (price == null || !Number.isFinite(price)) return 'Price unavailable';
+  if (price >= 1000) {
+    return price.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  }
+  if (price >= 1) {
+    return price.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+  }
+  return price.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumSignificantDigits: 4 });
+}
 
 function toHandle(email: string | null | undefined): string {
   const name = email?.split('@')[0]?.replace(/[^a-z0-9_]/gi, '').toLowerCase() || 'mw3user';
@@ -105,6 +135,51 @@ function normalizePost(row: NetworkPostRow): NetworkPost {
   };
 }
 
+function MarketMentionCards({
+  symbols,
+  marketBySymbol,
+}: {
+  symbols: string[];
+  marketBySymbol: Record<string, MentionMarket>;
+}) {
+  if (symbols.length === 0) return null;
+
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {symbols.map((symbol) => {
+        const market = marketBySymbol[symbol];
+        return (
+          <div
+            key={symbol}
+            className="overflow-hidden rounded-2xl border border-black/10 bg-white"
+          >
+            <div className="flex items-center justify-between gap-3 p-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">
+                  ${symbol}
+                </div>
+                <div className="mt-1 text-lg font-black">{fmtUsd(market?.price ?? null)}</div>
+              </div>
+              <div className="rounded-full border border-black px-2 py-1 text-[10px] font-black uppercase">
+                {market?.tone === 'ready' ? 'Live' : 'Search'}
+              </div>
+            </div>
+            <div className="flex h-10 items-end gap-1 bg-gray-50 px-3 pb-2">
+              {[28, 18, 24, 14, 30, 22, 35, 26, 38, 32].map((height, index) => (
+                <div
+                  key={`${symbol}-${index}`}
+                  className="flex-1 rounded-t bg-black"
+                  style={{ height: `${height}px`, opacity: 0.18 + index * 0.06 }}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SocialNetworkMindMap({ onClose }: SocialNetworkMindMapProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [posts, setPosts] = useState<NetworkPost[]>(DEMO_POSTS);
@@ -114,13 +189,23 @@ export default function SocialNetworkMindMap({ onClose }: SocialNetworkMindMapPr
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [marketBySymbol, setMarketBySymbol] = useState<Record<string, MentionMarket>>({});
+  const [marketMessage, setMarketMessage] = useState<string | null>(null);
 
   const remaining = 500 - body.length;
 
   const trending = useMemo(
-    () => ['#MW3Events', '#PerpsSafety', '#WalletFirst', '#ZurichBuilders', '#AmsterdamAlpha'],
+    () => ['$BTC', '$ETH', '$SOL', '#PerpsSafety', '#AmsterdamAlpha'],
     []
   );
+
+  const visibleSymbols = useMemo(() => {
+    const seen = new Set<string>();
+    for (const post of posts) {
+      for (const symbol of extractCashtags(post.body)) seen.add(symbol);
+    }
+    return [...seen].slice(0, 16);
+  }, [posts]);
 
   const loadPosts = useCallback(async () => {
     if (!supabaseEnabled || !supabase) {
@@ -173,6 +258,42 @@ export default function SocialNetworkMindMap({ onClose }: SocialNetworkMindMapPr
       cleanup?.();
     };
   }, [loadPosts]);
+
+  useEffect(() => {
+    if (visibleSymbols.length === 0) {
+      setMarketBySymbol({});
+      setMarketMessage(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    const rows = visibleSymbols.map((symbol) => ({
+      tradeId: `network-${symbol}`,
+      coinGeckoId: '',
+      symbol,
+    }));
+
+    void fetchOpenTradeUsdPrices(rows, controller.signal)
+      .then((prices) => {
+        const next: Record<string, MentionMarket> = {};
+        for (const symbol of visibleSymbols) {
+          const price = prices[`__trade:network-${symbol}`] ?? null;
+          next[symbol] = {
+            symbol,
+            price,
+            tone: typeof price === 'number' && Number.isFinite(price) ? 'ready' : 'missing',
+          };
+        }
+        setMarketBySymbol(next);
+        setMarketMessage(null);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setMarketMessage(formatCoingeckoError(err));
+      });
+
+    return () => controller.abort();
+  }, [visibleSymbols]);
 
   const publishPost = async () => {
     const text = body.trim();
@@ -334,6 +455,10 @@ export default function SocialNetworkMindMap({ onClose }: SocialNetworkMindMapPr
                         <span className="text-sm text-gray-400">· {relativeTime(post.createdAt)}</span>
                       </div>
                       <p className="mt-2 whitespace-pre-wrap break-words text-[15px] leading-6">{post.body}</p>
+                      <MarketMentionCards
+                        symbols={extractCashtags(post.body)}
+                        marketBySymbol={marketBySymbol}
+                      />
                       <div className="mt-4 flex max-w-md justify-between text-sm font-semibold text-gray-500">
                         <span className="inline-flex items-center gap-1">
                           <MessageCircle className="h-4 w-4" />
@@ -390,6 +515,31 @@ export default function SocialNetworkMindMap({ onClose }: SocialNetworkMindMapPr
                   {tag}
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-black/10 bg-gray-50 p-4">
+            <div className="mb-3 text-sm font-black uppercase">Market watch</div>
+            {marketMessage && (
+              <div className="mb-3 rounded-xl border border-yellow-700 bg-yellow-50 p-2 text-xs font-semibold text-yellow-900">
+                {marketMessage}
+              </div>
+            )}
+            <div className="space-y-2">
+              {visibleSymbols.length === 0 ? (
+                <div className="text-xs leading-5 text-gray-500">
+                  Mention tokens with cashtags like $BTC or $SOL to attach prices to posts.
+                </div>
+              ) : (
+                visibleSymbols.slice(0, 8).map((symbol) => (
+                  <div key={symbol} className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2">
+                    <div className="font-black">${symbol}</div>
+                    <div className="text-sm font-bold text-gray-600">
+                      {fmtUsd(marketBySymbol[symbol]?.price ?? null)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </aside>
