@@ -14,6 +14,7 @@ const ProfitCalendarMindMap = lazy(() => import('../components/ProfitCalendarMin
 const ArtMindMap = lazy(() => import('../components/ArtMindMap'));
 const SocialMindMap = lazy(() => import('../components/social/SocialMindMap'));
 const EventsMindMap = lazy(() => import('../components/events/EventsMindMap'));
+const SocialNetworkMindMap = lazy(() => import('../components/social-network/SocialNetworkMindMap'));
 
 export const sectionComponents: Record<
   SectionId,
@@ -27,4 +28,5 @@ export const sectionComponents: Record<
   art: ArtMindMap,
   social: SocialMindMap,
   events: EventsMindMap,
+  network: SocialNetworkMindMap,
 };

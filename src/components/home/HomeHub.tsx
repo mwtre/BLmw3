@@ -3,6 +3,7 @@ import {
   CalendarRange,
   Clapperboard,
   MapPinned,
+  MessageSquare,
   Image,
   Network,
   Share2,
@@ -18,13 +19,14 @@ const sections: {
   angle: number;
 }[] = [
   { id: 'dao', label: 'DAO', icon: Network, angle: 0 },
-  { id: 'defi', label: 'DeFi', icon: TrendingUp, angle: 45 },
-  { id: 'trade', label: 'Trade', icon: ArrowRightLeft, angle: 90 },
-  { id: 'nft', label: 'NFT', icon: Image, angle: 135 },
-  { id: 'profit', label: 'Profit', icon: CalendarRange, angle: 180 },
-  { id: 'art', label: 'ART', icon: Clapperboard, angle: 225 },
-  { id: 'social', label: 'SOCIAL', icon: Share2, angle: 270 },
-  { id: 'events', label: 'EVENTS', icon: MapPinned, angle: 315 },
+  { id: 'defi', label: 'DeFi', icon: TrendingUp, angle: 40 },
+  { id: 'trade', label: 'Trade', icon: ArrowRightLeft, angle: 80 },
+  { id: 'nft', label: 'NFT', icon: Image, angle: 120 },
+  { id: 'profit', label: 'Profit', icon: CalendarRange, angle: 160 },
+  { id: 'art', label: 'ART', icon: Clapperboard, angle: 200 },
+  { id: 'social', label: 'SOCIAL', icon: Share2, angle: 240 },
+  { id: 'events', label: 'EVENTS', icon: MapPinned, angle: 280 },
+  { id: 'network', label: 'NETWORK', icon: MessageSquare, angle: 320 },
 ];
 
 interface HomeHubProps {

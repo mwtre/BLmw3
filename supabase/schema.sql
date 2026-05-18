@@ -412,3 +412,50 @@ on public.social_audit_log
 for insert
 with check (lower(coalesce(auth.jwt()->>'email','')) = 'egos.kappa88@hotmail.it');
 
+-- MW3 Social Network: public timeline, authenticated posting.
+create table if not exists public.social_network_posts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  author_email text null,
+  author_name text not null,
+  handle text not null,
+  body text not null check (char_length(body) between 1 and 500),
+  likes_count int not null default 0,
+  replies_count int not null default 0,
+  reposts_count int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists social_network_posts_created_at_idx
+on public.social_network_posts(created_at desc);
+
+create index if not exists social_network_posts_user_id_idx
+on public.social_network_posts(user_id);
+
+alter table public.social_network_posts enable row level security;
+
+drop policy if exists "social_network_posts_public_read" on public.social_network_posts;
+create policy "social_network_posts_public_read"
+on public.social_network_posts
+for select
+using (true);
+
+drop policy if exists "social_network_posts_insert_signed_in" on public.social_network_posts;
+create policy "social_network_posts_insert_signed_in"
+on public.social_network_posts
+for insert
+with check (auth.uid() = user_id);
+
+drop policy if exists "social_network_posts_update_own" on public.social_network_posts;
+create policy "social_network_posts_update_own"
+on public.social_network_posts
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists "social_network_posts_delete_own" on public.social_network_posts;
+create policy "social_network_posts_delete_own"
+on public.social_network_posts
+for delete
+using (auth.uid() = user_id);

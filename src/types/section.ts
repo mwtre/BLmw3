@@ -6,4 +6,5 @@ export type SectionId =
   | 'profit'
   | 'art'
   | 'social'
-  | 'events';
+  | 'events'
+  | 'network';
